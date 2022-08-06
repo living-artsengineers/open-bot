@@ -9,8 +9,8 @@ Just figuring out how to use the OpenBot? Check out the [docs](docs/README.md).
 We're using Python because it's widely used, mostly unsurprising (unlike some parts of [JavaScript](https://github.com/denysdovhan/wtfjs)), and beginner-friendly. You can write new modules (offering a cohesive set of features through event handlers and commands), improve existing ones, improve the modular architecture, or anything else.
 
 1. If not done already, send your uniqname in the [Group members thread](https://discord.com/channels/1002274815270465607/1005317489506394202) in `#open-bot-dev` so that the maintainer can invite you to the [Living ArtsEngineers](https://gitlab.umich.edu/living-artsengineers) group.
-1. If not done already, download `env.json` from the pinned messages in `#open-bot-dev`, and join _Bot testing_ via the invite there.
 1. Create a new branch from the `main` branch, then clone it locally
+1. If not done already, download `env.json` from the pinned messages in `#open-bot-dev` to your local clone, and join _Bot testing_ via the invite there.
 1. Get [`pdm`](https://pdm.fming.dev/latest/) if not already installed
 1. Run `pdm install` to install dependencies
 1. Make your changes. If you're making a module, check out [existing modules](mod/) for examples, and remember to add it to [mod/\_\_init\_\_.py](mod/__init__.py).
