@@ -11,6 +11,7 @@ We're using Python because it's widely used, mostly unsurprising (unlike some pa
 1. Get [`pdm`](https://pdm.fming.dev/latest/) if not already installed
 1. Run `pdm install` to install dependencies
 1. Check out [existing modules](mod/) for examples
-1. Code your module, and add it to [mod/\_\_init\_\_.py](mod/__init__.py)
+1. Make your changes (they can be anything!) If you're making a module, add it to [mod/\_\_init\_\_.py](mod/__init__.py).
 1. Run `black` to format your code
 1. Start a Merge Request into the main branch
+
