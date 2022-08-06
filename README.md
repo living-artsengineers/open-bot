@@ -24,4 +24,4 @@ OpenBot has two deployment environments: development (`dev`) and production (`pr
 
 ## Document reported issues and ideas
 
-Once we identify a specific problem or idea from non-technical discussion, make an issue under this repository to keep track of i ts progress. No rigid rules on the formatting of your issue, but for problems, make sure to describe the problem specifically ("... doesn't work" won't suffice) and tell us how to reproduce the problem. Make sure to attach either the _feature_ tag or the _bug_ tag to each issue as appropriate.
+Once we identify a specific problem or idea from non-technical discussion, make an issue under this repository to keep track of its progress. No rigid rules on the formatting of your issue, but for problems, make sure to describe the problem specifically ("... doesn't work" won't suffice) and tell us how to reproduce the problem. Make sure to attach either the _feature_ tag or the _bug_ tag to each issue as appropriate. Check existing issues for examples.
