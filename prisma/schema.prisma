@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Message {
-  id      Int      @id @default(autoincrement())
+  id      BigInt      @id
   author  BigInt
   length  Int
   channel BigInt

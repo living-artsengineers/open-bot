@@ -20,6 +20,7 @@ async function main() {
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMessageReactions,
     ],
   });
