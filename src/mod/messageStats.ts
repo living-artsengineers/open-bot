@@ -1,9 +1,21 @@
 import { SlashCommandBuilder } from 'discord.js'
 import { Module } from './module'
-import db from '../storage'
+import db, { ensureUserExists } from '../storage'
 
 const messageStats: Module = {
     name: 'MessageStats',
+    async setup(client) {
+        client.on('messageCreate', async msg => {
+            await ensureUserExists(msg.author.id, msg.author.username)
+            await db.message.create({data: {
+                id: Number(msg.id),
+                author: BigInt(msg.author.id),
+                length: msg.content.trim().length,
+                channel: BigInt(msg.channelId),
+                time: new Date()
+            }})
+        })
+    },
     commands: [
         new SlashCommandBuilder()
             .setName("mymessagestats")

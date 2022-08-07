@@ -21,7 +21,8 @@ async function main() {
     const commandMap: {[commandName: string]: Module} = {}
     for (const mod of Object.values(modules)) {
         if (mod.setup !== undefined) {
-            mod.setup(client)
+            await mod.setup(client)
+            console.log('Done setting up', mod.name)
         }
         for (const cmd of (mod.commands ?? [])) {
             if (Object.keys(commandMap).includes(cmd.name)) {
