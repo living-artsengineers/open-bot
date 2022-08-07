@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Message {
-  id      BigInt      @id
+  id      BigInt   @id
   author  BigInt
   length  Int
   channel BigInt
@@ -21,5 +21,22 @@ model Message {
 model User {
   id       BigInt    @id
   username String
-  Message  Message[]
+  messages Message[]
+  quotes   Quote[]
+}
+
+model Conversation {
+  id     Int      @id @default(autoincrement())
+  quotes Quote[]
+  date   DateTime
+}
+
+model Quote {
+  id           Int          @id @default(autoincrement())
+  speaker      User         @relation(fields: [speakerId], references: [id])
+  content      String
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  speakerId      BigInt
+  conversationId Int
 }

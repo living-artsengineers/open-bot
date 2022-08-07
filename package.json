@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write src",
     "lint": "eslint src",
-    "dev": "nodemon -w src --ext ts --exec 'node -r @swc-node/register src/index.ts'"
+    "dev": "nodemon -w src --ext ts --exec \"node -r @swc-node/register src/index.ts\""
   },
   "repository": {
     "type": "git",
