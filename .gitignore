@@ -2,6 +2,8 @@ __pycache__/
 .venv/
 .pdm*
 env.json
-*.sqlite
 node_modules/
+.DS_Store
+prisma/migrations
+*.sqlite*
 .pnpm-debug.log

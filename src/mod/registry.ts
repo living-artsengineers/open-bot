@@ -1,6 +1,5 @@
-import { Module } from './module'
-import messageStats from './messageStats'
+import messageStats from "./messageStats";
 
 export default {
-    messageStats
-}
+  messageStats,
+};

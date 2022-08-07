@@ -8,6 +8,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write src",
+    "lint": "eslint src",
     "dev": "nodemon -w src --ext ts --exec 'node -r @swc-node/register src/index.ts'"
   },
   "repository": {
@@ -19,7 +21,11 @@
   "devDependencies": {
     "@swc-node/register": "^1.5.1",
     "@types/node": "^18.6.4",
+    "@typescript-eslint/eslint-plugin": "^5.32.0",
+    "@typescript-eslint/parser": "^5.32.0",
+    "eslint": "^8.21.0",
     "nodemon": "^2.0.19",
+    "prettier": "2.7.1",
     "prisma": "^4.1.1",
     "typescript": "^4.7.4"
   },

@@ -6,17 +6,16 @@ Just figuring out how to use the OpenBot? Check out the [docs](docs/README.md).
 
 ## Code
 
-We're using Python because it's widely used, mostly unsurprising (unlike some parts of [JavaScript](https://github.com/denysdovhan/wtfjs)), and beginner-friendly. You can write new modules (offering a cohesive set of features through event handlers and commands), improve existing ones, improve the modular architecture, or anything else.
+We're using TypeScript (JavaScript + static typing) on Node.js for its strong typing, robust ecosystem, and event-driven design (see [#3](https://gitlab.umich.edu/living-artsengineers/open-bot/-/issues/3)). You can write new modules (offering a cohesive set of features through event handlers and commands), improve existing ones, improve the modular architecture, or anything else.
 
 1. If not done already, send your uniqname in the [Group members thread](https://discord.com/channels/1002274815270465607/1005317489506394202) in `#open-bot-dev` so that the maintainer can invite you to the [Living ArtsEngineers](https://gitlab.umich.edu/living-artsengineers) group.
-1. Create a new branch from the `main` branch, then clone it locally
+1. Create a new branch from the `main` branch, then clone it locally.
 1. If not done already, download `env.json` from the pinned messages in `#open-bot-dev` to your local clone, and join _Bot testing_ via the invite there.
-1. Get [`pdm`](https://pdm.fming.dev/latest/) if not already installed
-1. Run `pdm install` to install dependencies
-1. Make your changes. If you're making a module, check out [existing modules](mod/) for examples, and remember to add it to [mod/\_\_init\_\_.py](mod/__init__.py).
+1. Install dependencies with your Node.js package manager of choice, like `npm`, `yarn`, or `pnpm`.
+1. Make your changes. If you're making a module, check out [existing modules](mod/) for examples, and remember to add it to [mod/registry.ts](mod/registry.ts). Use `npm run dev` to automatically re-launch the dev bot when a source file changes.
 1. Test your changes with OpenBotDev in the _Bot testing_ server.
-1. Run `black` to format your code, then push it to your branch
-1. Start a Merge Request into the `main` branch
+1. Run `npm run format` and `npm run lint` to format and lint your code. Try to fix all linter warnings.
+1. Start a Merge Request into the `main` branch.
 
 ### Environments
 
@@ -24,4 +23,4 @@ OpenBot has two deployment environments: development (`dev`) and production (`pr
 
 ## Document reported issues and ideas
 
-Once we identify a specific problem or idea from non-technical discussion, make an issue under this repository to keep track of its progress. No rigid rules on the formatting of your issue, but for problems, make sure to describe the problem specifically ("... doesn't work" won't suffice) and tell us how to reproduce the problem. Make sure to attach either the _feature_ tag or the _bug_ tag to each issue as appropriate. Check existing issues for examples.
+Once we identify a specific problem or idea from non-technical discussion, make an issue under this repository to keep track of its progress. No rigid rules on the formatting of your issue, but for problems, make sure to describe the problem specifically ("... doesn't work" won't suffice) and tell us how to reproduce the problem. Make sure to attach the _feature_ tag, the _core_ tag, or the _bug_ tag to each issue as appropriate. Check existing issues for examples.
