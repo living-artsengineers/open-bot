@@ -1,0 +1,37 @@
+{
+  "name": "open-bot",
+  "version": "0.1.0",
+  "description": "Living ArtsEngine's collaborative Discord bot",
+  "main": "src/index.ts",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write src",
+    "lint": "eslint src",
+    "dev": "nodemon -w src --ext ts --exec 'node -r @swc-node/register src/index.ts'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.umich.edu:Living-ArtsEngineers/open-bot"
+  },
+  "author": "Living ArtsEngineers",
+  "license": "MIT",
+  "devDependencies": {
+    "@swc-node/register": "^1.5.1",
+    "@types/node": "^18.6.4",
+    "@typescript-eslint/eslint-plugin": "^5.32.0",
+    "@typescript-eslint/parser": "^5.32.0",
+    "eslint": "^8.21.0",
+    "nodemon": "^2.0.19",
+    "prettier": "2.7.1",
+    "prisma": "^4.1.1",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "@discordjs/rest": "^1.0.1",
+    "@prisma/client": "^4.1.1",
+    "discord.js": "^14.1.2"
+  }
+}
