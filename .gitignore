@@ -4,6 +4,5 @@ __pycache__/
 env.json
 node_modules/
 .DS_Store
-prisma/migrations
 *.sqlite*
 .pnpm-debug.log

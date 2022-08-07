@@ -1,19 +1,6 @@
-import { Client, GatewayIntentBits, REST, Routes } from "discord.js";
-import { argv } from "process";
+import { Client, GatewayIntentBits } from "discord.js";
 import env from "./environment";
-import { Module } from "./mod/module";
 import modules from "./mod/registry";
-
-async function setupInteractions() {
-  const rest = new REST({ version: "10" }).setToken(env.token);
-  const commands = Object.values(modules)
-    .map((m) => m.commands ?? [])
-    .flat();
-  await rest.put(Routes.applicationGuildCommands(env.clientId, env.guild), {
-    body: commands,
-  });
-  console.log("Done setting up interactions");
-}
 
 async function main() {
   const client = new Client({
@@ -25,38 +12,43 @@ async function main() {
     ],
   });
 
-  const commandMap: { [commandName: string]: Module } = {};
-  for (const mod of Object.values(modules)) {
-    if (mod.setup !== undefined) {
-      await mod.setup(client);
-      console.log("Done setting up", mod.name);
-    }
-    for (const cmd of mod.commands ?? []) {
-      if (Object.keys(commandMap).includes(cmd.name)) {
-        console.warn(
-          `Command conflict! ${cmd.name} is claimed by both "${
-            commandMap[cmd.name].name
-          }" and "${mod.name}". Dispatching to the former.`
-        );
-      } else {
-        commandMap[cmd.name] = mod;
-      }
-    }
+  for (const [name, mod] of Object.entries(modules)) {
+    console.log(`Setting up module: ${name}`);
+    await mod.setup?.(client);
   }
 
+  const commandHandlers = Object.values(modules)
+    .flatMap((mod) => mod.commands ?? [])
+    .map((cmd) => new cmd());
+
   client.on("interactionCreate", async (intx) => {
-    if (!intx.isChatInputCommand()) return;
-    const mod = commandMap[intx.commandName];
-    if (mod !== undefined && mod.interact !== undefined) {
-      await mod.interact(intx);
+    const handler = commandHandlers.find((cmd) => cmd._test(intx));
+
+    if (handler !== undefined) {
+      const checkResult = await handler.check(intx);
+      if (typeof checkResult === "string" && intx.isRepliable()) {
+        intx.reply({ ephemeral: true, content: checkResult });
+        return;
+      }
+      await handler.run(intx);
     }
   });
 
-  client.login(env.token);
+  client.once("ready", async (client) => {
+    // TODO: check for differences in commands and update only if necessary
+    console.log("Registering commands");
+
+    const data = commandHandlers.map((cmd) => {
+      const b = cmd._build();
+      cmd.build(b);
+      return b;
+    });
+
+    await client.application.commands.set(data);
+    console.log("Done registering commands");
+  });
+
+  await client.login(env.token);
 }
 
-if (argv[argv.length - 1] === "setup" || env.name === "dev") {
-  setupInteractions().then(main).catch(console.error);
-} else {
-  main().catch(console.error);
-}
+main().catch(console.error);
