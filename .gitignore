@@ -3,3 +3,5 @@ __pycache__/
 .pdm*
 env.json
 *.sqlite
+node_modules/
+.pnpm-debug.log
