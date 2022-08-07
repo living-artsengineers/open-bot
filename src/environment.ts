@@ -2,9 +2,9 @@
 import * as envConfig from './env.json'
 
 interface Environment {
-    guild: number,
-    appId: number,
-    token: string,
+    guild: string
+    clientId: string
+    token: string
     name: 'dev'|'prod'
 }
 

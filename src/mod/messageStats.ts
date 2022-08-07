@@ -11,8 +11,11 @@ const messageStats: Module = {
     ],
     async interact(interaction) {
         if (interaction.commandName === 'mymessagestats') {
-            const count = await db.message.count({where: {author: Number(interaction.user.id)}})
-            await interaction.reply(`You have sent ${count} message${count === 1 ? '' : 's'}`)
+            const count = await db.message.count({where: {author: {equals: BigInt(interaction.user.id)}}})
+            await interaction.reply({
+                content: `You have sent ${count} message${count === 1 ? '' : 's'}`,
+                ephemeral: true
+            })
         }
     }
 }

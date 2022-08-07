@@ -7,7 +7,7 @@ import modules from './mod/registry'
 async function setupInteractions() {
     const rest = new REST({version: '10'}).setToken(env.token)
     const commands = Object.values(modules).map(m => m.commands ?? []).flat()
-    await rest.put(Routes.applicationGuildCommands(env.appId.toString(), env.guild.toString()), {body: commands})
+    await rest.put(Routes.applicationGuildCommands(env.clientId, env.guild), {body: commands})
     console.log('Done setting up interactions')
 }
 
