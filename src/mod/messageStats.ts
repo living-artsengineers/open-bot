@@ -20,7 +20,7 @@ const messageStats: Module = {
     });
   },
   commands: [
-    new (class extends SlashCommand {
+    class extends SlashCommand {
       name = "mymessagestats";
       description = "Check basic statistics about the messages I have sent here.";
 
@@ -37,7 +37,7 @@ const messageStats: Module = {
           ephemeral: true,
         });
       }
-    })(),
+    },
   ],
 };
 

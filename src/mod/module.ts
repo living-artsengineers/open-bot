@@ -94,6 +94,8 @@ export abstract class SlashCommand extends InteractionCommand<ChatInputCommandIn
   }
 }
 
+type Constructable<T, A extends unknown[]> = new (...args: A[]) => T;
+
 export interface Module {
   name: string;
 
@@ -106,5 +108,5 @@ export interface Module {
   /**
    * Commands provided by this module
    */
-  commands?: InteractionCommand[];
+  commands?: Constructable<InteractionCommand, []>[];
 }

@@ -10,15 +10,8 @@ import {
   CacheType,
 } from "discord.js";
 import client, { ensureUserExists } from "../storage";
+import { stripMarkdownTag } from "../utils";
 import { Module, ContextMenuCommand, SlashCommand } from "./module";
-
-function stripMarkdown(s: string): string {
-  return s.replace(/(\*|_|~|`|\[|\]|\(|\)|\||\\)/g, "\\$1").replace(/\s+/g, " ");
-}
-
-function stripMarkdownTag(strings: TemplateStringsArray, ...expr: unknown[]) {
-  return strings.reduce((acc, s, i) => acc + s + (i < expr.length ? stripMarkdown(String(expr[i])) : ""), "");
-}
 
 function conversationEmbed(
   cx: Conversation & {
@@ -52,7 +45,7 @@ const conversationFetchSelector = {
 const quotes: Module = {
   name: "Quotes",
   commands: [
-    new (class extends ContextMenuCommand {
+    class extends ContextMenuCommand {
       name = "Quote";
       type = ApplicationCommandType.Message;
 
@@ -71,9 +64,9 @@ const quotes: Module = {
           embeds: [conversationEmbed(conv)],
         });
       }
-    })(),
+    },
 
-    new (class extends SlashCommand {
+    class extends SlashCommand {
       name = "read-conversation";
       description = "Read the entire conversation with the given C#ID.";
 
@@ -97,9 +90,9 @@ const quotes: Module = {
           embeds: [conversationEmbed(conv)],
         });
       }
-    })(),
+    },
 
-    new (class extends SlashCommand {
+    class extends SlashCommand {
       name = "add-quote";
       description = "Add a quote to a new or existing conversation.";
 
@@ -129,29 +122,31 @@ const quotes: Module = {
           embeds: [conversationEmbed(conv)],
         });
       }
-    })(),
+    },
 
-    new (class extends SlashCommand {
+    class extends SlashCommand {
       name = "random-conversation";
       description = "Read a random quoted conversation.";
 
       async run(ix: ChatInputCommandInteraction<CacheType>) {
-        const convRecord = await client.$queryRawUnsafe<Pick<Conversation, "id">>(
+        // See: https://github.com/prisma/prisma/discussions/5886
+        // TL;DR: Prisma doesn't give us an efficient way to fetch one random row
+        const convRecord = await client.$queryRawUnsafe<Pick<Conversation, "id">[]>(
           "SELECT id FROM Conversation ORDER BY RANDOM() LIMIT 1"
         );
-        if (convRecord === null) {
+        if (convRecord.length === 0) {
           await ix.reply({
             ephemeral: true,
             content: "No conversations exist!",
           });
         }
-        const conv = await fetchConversation(convRecord.id);
+        const conv = await fetchConversation(convRecord[0].id);
         assert(conv !== null);
         await ix.reply({
           embeds: [conversationEmbed(conv)],
         });
       }
-    })(),
+    },
   ],
 };
 
