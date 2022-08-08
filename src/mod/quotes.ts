@@ -1,5 +1,5 @@
 import { Conversation, Quote, User } from "@prisma/client";
-import assert = require("assert");
+import assert from "assert";
 import {
   ApplicationCommandType,
   ChatInputCommandInteraction,
@@ -10,7 +10,7 @@ import {
   CacheType,
 } from "discord.js";
 import client, { ensureUserExists } from "../storage";
-import { stripMarkdownTag } from "../utils";
+import { fetchGuildNickname, stripMarkdownTag } from "../utils";
 import { Module, ContextMenuCommand, SlashCommand } from "./module";
 
 function conversationEmbed(
@@ -58,7 +58,9 @@ const quotes: Module = {
       async run(ix: MessageContextMenuCommandInteraction) {
         await ensureUserExists(
           ix.targetMessage.author.id,
-          ix.targetMessage.member?.nickname ?? ix.targetMessage.author.username
+          ix.targetMessage.member?.nickname ??
+            (await fetchGuildNickname(ix.client, ix.targetMessage.author.id)) ??
+            ix.targetMessage.author.username
         );
         const authorId = BigInt(ix.targetMessage.author.id);
         const conv = await createQuote(ix.targetMessage.cleanContent, authorId);
@@ -114,20 +116,12 @@ const quotes: Module = {
           );
       }
 
-      override check(ix: ChatInputCommandInteraction) {
-        if (!ix.inGuild()) {
-          return ":warning: You may not quote yourself in a DM!";
-        }
-      }
-
       async run(ix: ChatInputCommandInteraction) {
         const content = ix.options.getString("content", true);
         const speaker = ix.options.getUser("speaker", true);
         const conversationId = ix.options.getInteger("conversation-id", false) ?? undefined;
 
-        assert(ix.guild !== null);
-        const member = await ix.guild.members.fetch(speaker.id);
-        await ensureUserExists(speaker.id, member.nickname ?? speaker.username);
+        await ensureUserExists(speaker.id, (await fetchGuildNickname(ix.client, speaker.id)) ?? speaker.username);
         const conv = await createQuote(content, BigInt(speaker.id), conversationId);
         await ix.reply({
           embeds: [conversationEmbed(conv)],
