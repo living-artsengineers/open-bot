@@ -7,6 +7,10 @@ interface Environment {
   guild: string;
   clientId: string;
   token: string;
+  umApi: {
+    clientId: string;
+    clientSecret: string;
+  };
   name: keyof typeof envConfig;
 }
 
