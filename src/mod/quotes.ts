@@ -22,7 +22,7 @@ function conversationEmbed(
 ): EmbedBuilder {
   return new EmbedBuilder()
     .setTitle(cx.quotes.map((q) => stripMarkdownTag`_${q.content}_  ―${q.speaker.username}`).join("\n"))
-    .setDescription(time(cx.date, "D"))
+    .setTimestamp(cx.date)
     .setFooter({
       text: stripMarkdownTag`C#${cx.id} Q#${cx.quotes.map((q) => q.id).join("-")}`,
     });
