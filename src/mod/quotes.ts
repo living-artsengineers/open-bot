@@ -6,7 +6,6 @@ import {
   EmbedBuilder,
   MessageContextMenuCommandInteraction,
   SlashCommandBuilder,
-  time,
   CacheType,
 } from "discord.js";
 import client, { ensureUserExists } from "../storage";

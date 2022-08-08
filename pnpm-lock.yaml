@@ -4,11 +4,13 @@ specifiers:
   '@discordjs/rest': ^1.0.1
   '@prisma/client': ^4.1.1
   '@swc-node/register': ^1.5.1
+  '@types/luxon': ^3.0.0
   '@types/node': ^18.6.4
   '@typescript-eslint/eslint-plugin': ^5.32.0
   '@typescript-eslint/parser': ^5.32.0
   discord.js: ^14.1.2
   eslint: ^8.21.0
+  luxon: ^3.0.1
   nodemon: ^2.0.19
   prettier: 2.7.1
   prisma: ^4.1.1
@@ -18,7 +20,9 @@ specifiers:
 dependencies:
   '@discordjs/rest': 1.0.1
   '@prisma/client': 4.1.1_prisma@4.1.1
+  '@types/luxon': 3.0.0
   discord.js: 14.1.2
+  luxon: 3.0.1
 
 devDependencies:
   '@swc-node/register': 1.5.1_typescript@4.7.4
@@ -377,6 +381,10 @@ packages:
   /@types/json-schema/7.0.11:
     resolution: {integrity: sha512-wOuvG1SN4Us4rez+tylwwwCV1psiNVOkJeM3AUWUNWg/jDQY2+HE/444y5gc+jBmRqASOm2Oeh5c1axHobwRKQ==}
     dev: true
+
+  /@types/luxon/3.0.0:
+    resolution: {integrity: sha512-Lx+EZoJxUKw4dp8uei9XiUVNlgkYmax5+ovqt6Xf3LzJOnWhlfJw/jLBmqfGVwOP/pDr4HT8bI1WtxK0IChMLw==}
+    dev: false
 
   /@types/node/18.6.4:
     resolution: {integrity: sha512-I4BD3L+6AWiUobfxZ49DlU43gtI+FTHSv9pE2Zekg6KjMpre4ByusaljW3vYSLJrvQ1ck1hUaeVu8HVlY3vzHg==}
@@ -1371,6 +1379,11 @@ packages:
     dependencies:
       yallist: 4.0.0
     dev: true
+
+  /luxon/3.0.1:
+    resolution: {integrity: sha512-hF3kv0e5gwHQZKz4wtm4c+inDtyc7elkanAsBq+fundaCdUBNJB1dHEGUZIM6SfSBUlbVFduPwEtNjFK8wLtcw==}
+    engines: {node: '>=12'}
+    dev: false
 
   /merge2/1.4.1:
     resolution: {integrity: sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==}
