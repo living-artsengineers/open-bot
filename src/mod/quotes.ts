@@ -1,5 +1,5 @@
 import { Conversation, Quote, User } from "@prisma/client";
-import assert from "assert";
+import assert = require("assert");
 import {
   ApplicationCommandType,
   ChatInputCommandInteraction,
