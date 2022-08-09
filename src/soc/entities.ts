@@ -94,24 +94,30 @@ export enum Weekday {
   Sunday = "Sun",
 }
 
-export interface Meeting {
+export interface Meeting<Loc extends boolean = false> {
   /**
    * The set of weekdays on which this meeting takes place.
    */
   days: Set<Weekday>;
   /**
-   * The duration from midnight to the starting time of this meeting.
+   * The duration from midnight to the starting time of this meeting, or null if TBA.
    */
-  startTime: Duration;
+  startTime: Duration | null;
   /**
-   * The duration from midnight to the ending time of this meeting.
+   * The duration from midnight to the ending time of this meeting, or null if TBA.
    */
-  endTime: Duration;
+  endTime: Duration | null;
+
+  /**
+   * @example "1690 BEYSTER"
+   */
+  location: Loc extends true ? string | null : null;
 }
 
-export interface Section {
+export interface Section<Loc extends boolean = false> {
   readonly number: number;
   readonly type: SectionType;
+  readonly enrollStatus: EnrollmentStatus;
   readonly enrolled: number;
   readonly capacity: number;
   /**
@@ -121,7 +127,7 @@ export interface Section {
   readonly seatsAvailable: number;
   readonly credits: number;
   readonly classNumber: number;
-  readonly meetings: Meeting[];
+  readonly meetings: Meeting<Loc>[];
   readonly instructors: {
     uniqname: string;
     firstName: string;
