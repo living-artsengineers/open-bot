@@ -167,9 +167,9 @@
     "lng": -83.741552,
     "name": "Betsy Barbour House"
   },
-  "BYSTR": {
+  "BEYSTER": {
     "address": "2260 Hayward Street Ann Arbor, MI 48109-2121",
-    "id": "bystr",
+    "id": "beyster",
     "lat": 42.292935,
     "lng": -83.716195,
     "name": "Bob and Betty Beyster Building"
@@ -293,9 +293,9 @@
     "lng": -83.716045,
     "name": "Duderstadt Center"
   },
-  "SM": {
+  "MOORE": {
     "address": "1100 Baits Drive Ann Arbor, MI 48109-2085",
-    "id": "sm",
+    "id": "moore",
     "lat": 42.289774,
     "lng": -83.720958,
     "name": "Earl V. Moore Building"
@@ -1125,5 +1125,19 @@
     "lat": 42.267611,
     "lng": -83.74102,
     "name": "Yost Ice Arena"
+  },
+  "DOW": {
+    "address": "2300 Hayward Street Ann Arbor, MI 48109",
+    "id": "dow",
+    "lat": 42.29302,
+    "lng": -83.71543,
+    "name": "Herbert H. Dow Building"
+  },
+  "CCCB": {
+    "address": "1225 Geddes Avenue Ann Arbor, MI 48109",
+    "id": "cccb",
+    "lat": 42.2785,
+    "lng": -83.7339,
+    "name": "Central Campus Classroom Building"
   }
 }

@@ -96,11 +96,13 @@ test("Parse Sections response", () => {
         days: new Set([Weekday.Monday, Weekday.Wednesday]),
         startTime: Duration.fromObject({ hour: 10, minute: 30 }),
         endTime: Duration.fromObject({ hour: 11, minute: 30 }),
+        location: null,
       },
       {
         days: new Set([Weekday.Friday]),
         startTime: Duration.fromObject({ hour: 9, minute: 30 }),
         endTime: Duration.fromObject({ hour: 11, minute: 30 }),
+        location: null,
       },
     ],
     instructors: [
@@ -162,6 +164,7 @@ test("Parse Sections response", () => {
         days: new Set([Weekday.Monday, Weekday.Wednesday, Weekday.Friday]),
         startTime: Duration.fromDurationLike({ hour: 9, minute: 0 }),
         endTime: Duration.fromDurationLike({ hour: 10, minute: 0 }),
+        location: null,
       },
     ],
     instructors: [
