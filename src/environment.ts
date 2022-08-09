@@ -16,6 +16,7 @@ interface Environment {
 }
 
 export default {
+  ...envConfig,
   ...envConfig[activeEnv],
   name: activeEnv,
 } as Environment;
