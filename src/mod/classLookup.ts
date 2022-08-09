@@ -108,7 +108,7 @@ export const classLookup: Module = {
 async function buildEmbed(course: Course, section: Section<true>) {
   const descr = await umClient.fetchCourseDescription(course, termCodes["Fall 2022"]);
   const embed = new EmbedBuilder()
-    .setTitle(`${course.toString()}, ${section.type} Section ${section.number}`)
+    .setTitle(`${course.toString()}: ${section.type} Section ${section.number}`)
     .addFields([
       {
         name: `Meeting${section.meetings.length === 1 ? "" : "s"}`,
@@ -138,6 +138,14 @@ async function buildEmbed(course: Course, section: Section<true>) {
     if (details !== null) {
       embed.setDescription(details);
     }
+  }
+
+  if (section.instructors.length > 0) {
+    embed.addFields({
+      name: "Instructors",
+      value: section.instructors.map((instr) => `${instr.firstName} ${instr.lastName} (${instr.uniqname})`).join("\n"),
+      inline: true,
+    });
   }
 
   // We intend that two meetings, one at ARR and another at a resolved location, should not cause a static map to show up

@@ -110,9 +110,16 @@ export interface SectionJson {
   CreditHours: number;
   ClassNumber: number;
   Meeting?: MeetingElement[] | MeetingElement;
+  // Reading by section number gives "Instructor", but reading by class number gives "ClassInstructors"
+  Instructor?: Instructor[] | Instructor;
   ClassInstructors?: ClassInstructor[] | ClassInstructor;
 }
 
+export interface Instructor {
+  Uniqname: string;
+  FirstName: string;
+  LastName: string;
+}
 export interface ClassInstructor {
   InstrUniqname: string;
   InstrName: string;
@@ -147,9 +154,16 @@ export function parseSection<Loc extends boolean>(sectionJson: SectionJson): Sec
         ...parseMeetingTimes(mtx.Times),
       }))
       .filter((it) => it.days.size > 0) as Meeting<Loc>[],
-    instructors: arrayify(sectionJson.ClassInstructors)
+    instructors: (arrayify(sectionJson.ClassInstructors) ?? [])
       .map((instr) => (instr === undefined ? null : parseInstructor(instr)))
-      .filter((it) => it !== null) as Section["instructors"],
+      .filter((it) => it !== null)
+      .concat(
+        (arrayify(sectionJson.Instructor) ?? []).map((instr) => ({
+          firstName: instr.FirstName,
+          lastName: instr.LastName,
+          uniqname: instr.Uniqname.toLowerCase(),
+        }))
+      ) as Section["instructors"],
   };
 }
 

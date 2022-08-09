@@ -144,9 +144,10 @@ test("Parse Sections response", () => {
       ClassMtgTopic: "TBA",
       Instructors: "Coppola,Brian P",
     },
-    ClassInstructors: {
-      InstrUniqname: "BCOPPOLA",
-      InstrName: "Coppola,Brian P",
+    Instructor: {
+      Uniqname: "BCOPPOLA",
+      FirstName: "Brian",
+      LastName: "Coppola",
     },
   };
 
