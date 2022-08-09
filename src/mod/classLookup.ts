@@ -1,5 +1,8 @@
-import { ChatInputCommandInteraction, EmbedBuilder, EmbedField, SlashCommandBuilder } from "discord.js";
-import { Course } from "../soc/entities";
+import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { DateTime, Duration } from "luxon";
+import { locationOfFacility } from "../campus/umCampus";
+import environment from "../environment";
+import { Course, Section } from "../soc/entities";
 import { termCodes, UMichSocApiClient } from "../soc/umichApi";
 import { stripMarkdownTag } from "../utils";
 import { Module, SlashCommand } from "./module";
@@ -16,8 +19,7 @@ export const classLookup: Module = {
       build(br: SlashCommandBuilder) {
         br.addStringOption((opt) =>
           opt.setName("course-code").setDescription("The course's code. Example: 'UARTS 150'").setRequired(true)
-        );
-        br.addIntegerOption((opt) =>
+        ).addIntegerOption((opt) =>
           opt.setName("section-number").setDescription("The desired section number. Example: 210").setRequired(true)
         );
       }
@@ -43,20 +45,9 @@ export const classLookup: Module = {
             return;
           }
 
-          const embed = new EmbedBuilder()
-            .setTitle(`${course.toString()}, Section ${section.number}`)
-            .setDescription(
-              section.meetings
-                .map(
-                  (mtg) =>
-                    `${mtg.startTime?.toFormat("hh:mm") ?? "TBA"} to ${mtg.endTime?.toFormat("hh:mm") ?? "TBA"} in ${
-                      mtg.location ?? "TBA"
-                    }`
-                )
-                .join("\n")
-            );
+          const embed = await buildEmbed(course, section);
           await ix.reply({
-            ephemeral: true,
+            ephemeral: false,
             embeds: [embed.toJSON()],
           });
         } catch (e) {
@@ -69,5 +60,45 @@ export const classLookup: Module = {
     },
   ],
 };
+
+async function buildEmbed(course: Course, section: Section<true>) {
+  const embed = new EmbedBuilder()
+    .setTitle(`${course.toString()}, Section ${section.number}`)
+    .setDescription(
+      (await umClient.fetchCourseDescription(course, termCodes["Fall 2022"])) ?? "No course description available."
+    )
+    .addFields(
+      section.meetings.map((mtg, i) => ({
+        name: `Meeting ${i + 1}`,
+        value: `${Array.from(mtg.days).join(", ")}\n${formatDuration(mtg.startTime)} to ${formatDuration(
+          mtg.endTime
+        )}\n${mtg.location ?? "TBA"}`,
+        inline: true,
+      }))
+    )
+    .addFields([
+      {
+        name: "Enrollment",
+        value: `${section.enrolled} / ${section.capacity} (${section.enrollStatus})`,
+        inline: true,
+      },
+    ]);
+
+  if (section.meetings.length === 1 && section.meetings[0].location !== null) {
+    const loc = locationOfFacility(section.meetings[0].location);
+    if (loc !== null) {
+      embed.setImage(
+        `https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-l+002277(${loc.lng},${loc.lat})/${loc.lng},${loc.lat},14.8,0/400x300@2x?access_token=${environment.mapboxToken}`
+      );
+    }
+  }
+  return embed;
+}
+
+function formatDuration(dur: Duration | null): string {
+  if (dur === null) return "TBA";
+  const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
+  return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);
+}
 
 export default classLookup;

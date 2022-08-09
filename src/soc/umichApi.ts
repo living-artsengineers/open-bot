@@ -7,6 +7,7 @@ export interface ISocApiClient {
   fetchSectionBySectionNumber(course: Course, sectionNumber: number, termCode: number): Promise<Section<true> | null>;
   fetchSectionByClassNumber(classNumber: number, termCode: number): Promise<Section<true> | null>;
   fetchAllSections(course: Course, termCode: number): Promise<Section<false>[]>;
+  fetchCourseDescription(course: Course, termCode: number): Promise<string | null>;
 }
 
 // We unfortunately cannot retrieve past term codes via the SOC API
@@ -57,6 +58,15 @@ export class UMichSocApiClient implements ISocApiClient {
     const section = res.data.getSOCSectionListByNbrResponse.ClassOffered;
     if (section === undefined) return null;
     return parseSection(section as SectionJson);
+  }
+
+  async fetchCourseDescription(course: Course, termCode: number): Promise<string | null> {
+    await this.refreshTokenIfNeeded();
+    const res = await this.axios.get(
+      `/Terms/${termCode}/Schools/UM/Subjects/${course.subject}/CatalogNbrs/${course.number}`
+    );
+    const descr: string = res.data.getSOCCourseDescrResponse.CourseDescr;
+    return descr === "No Course Description found." ? null : descr.substring(0, descr.indexOf(" --- "));
   }
 
   private async refreshTokenIfNeeded() {
