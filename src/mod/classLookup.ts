@@ -1,30 +1,74 @@
-import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import {
+  ApplicationCommandOptionChoiceData,
+  AutocompleteInteraction,
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  SlashCommandBuilder,
+} from "discord.js";
 import { DateTime, Duration } from "luxon";
 import { locationOfFacility } from "../campus/umCampus";
 import environment from "../environment";
 import { Course, Section } from "../soc/entities";
 import { termCodes, UMichSocApiClient } from "../soc/umichApi";
 import { stripMarkdownTag } from "../utils";
-import { Module, SlashCommand } from "./module";
+import { AutocompletingSlashCommand, Module } from "./module";
+import * as classCatalog from "../soc/sections-2410.json";
 
 const umClient = new UMichSocApiClient();
 
 export const classLookup: Module = {
   name: "classLookup",
   commands: [
-    class extends SlashCommand {
+    class extends AutocompletingSlashCommand {
       name = "lookup-section";
       description = "Look up a given course section.";
 
       build(br: SlashCommandBuilder) {
         br.addStringOption((opt) =>
-          opt.setName("course-code").setDescription("The course's code. Example: 'UARTS 150'").setRequired(true)
+          opt
+            .setName("course-code")
+            .setDescription('The course\'s code. Example: "UARTS 150"')
+            .setRequired(true)
+            .setAutocomplete(true)
         ).addIntegerOption((opt) =>
-          opt.setName("section-number").setDescription("The desired section number. Example: 210").setRequired(true)
+          opt
+            .setName("section-number")
+            .setDescription("The desired section number. Example: 210")
+            .setRequired(true)
+            .setAutocomplete(true)
         );
       }
 
-      override async run(ix: ChatInputCommandInteraction) {
+      async autocomplete(ix: AutocompleteInteraction): Promise<ApplicationCommandOptionChoiceData[] | null> {
+        const option = ix.options.getFocused(true);
+        if (option.name === "course-code") {
+          // Consider optimizing this
+          const possibleCourse = Course.parse(option.value);
+          return Object.keys(classCatalog)
+            .sort()
+            .filter(
+              (code) =>
+                code.startsWith(option.value.toUpperCase()) ||
+                (possibleCourse !== null && code.startsWith(possibleCourse.toString()))
+            )
+            .map((code) => ({ name: code, value: code }))
+            .slice(0, 25);
+        } else if (option.name === "section-number") {
+          const course = Course.parse(ix.options.getString("course-code", true));
+          if (course === null) return [];
+          if (!(course.toString() in classCatalog)) return [];
+          return classCatalog[course.toString() as keyof typeof classCatalog]
+            .filter((num) => num.toString().startsWith(option.value.replace(/^0+/g, "")))
+            .map((section) => ({
+              name: section.toString(),
+              value: section,
+            }))
+            .slice(0, 25);
+        }
+        return null;
+      }
+
+      async execute(ix: ChatInputCommandInteraction) {
         try {
           const inputCourseCode = ix.options.getString("course-code", true);
           const course = Course.parse(inputCourseCode);
@@ -47,7 +91,6 @@ export const classLookup: Module = {
 
           const embed = await buildEmbed(course, section);
           await ix.reply({
-            ephemeral: false,
             embeds: [embed.toJSON()],
           });
         } catch (e) {
@@ -55,6 +98,7 @@ export const classLookup: Module = {
             ephemeral: true,
             content: "Something went wrong: " + e,
           });
+          console.error(e);
         }
       }
     },
@@ -62,11 +106,10 @@ export const classLookup: Module = {
 };
 
 async function buildEmbed(course: Course, section: Section<true>) {
+  const descr = await umClient.fetchCourseDescription(course, termCodes["Fall 2022"]);
   const embed = new EmbedBuilder()
     .setTitle(`${course.toString()}, Section ${section.number}`)
-    .setDescription(
-      (await umClient.fetchCourseDescription(course, termCodes["Fall 2022"])) ?? "No course description available."
-    )
+    .setDescription(descr ?? "No course description available.")
     .addFields(
       section.meetings.map((mtg, i) => ({
         name: `Meeting ${i + 1}`,

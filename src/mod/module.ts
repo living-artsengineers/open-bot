@@ -1,6 +1,8 @@
 import {
   ApplicationCommandDataResolvable,
+  ApplicationCommandOptionChoiceData,
   ApplicationCommandType,
+  AutocompleteInteraction,
   BaseInteraction,
   ChatInputCommandInteraction,
   Client,
@@ -92,6 +94,36 @@ export abstract class SlashCommand extends InteractionCommand<ChatInputCommandIn
   _build() {
     return new SlashCommandBuilder().setName(this.name).setDescription(this.description);
   }
+}
+
+export abstract class AutocompletingSlashCommand extends InteractionCommand<
+  ChatInputCommandInteraction | AutocompleteInteraction,
+  SlashCommandBuilder
+> {
+  abstract readonly name: string;
+  abstract readonly description: string;
+
+  _test(ix: BaseInteraction): ix is ChatInputCommandInteraction | AutocompleteInteraction {
+    return (ix.isChatInputCommand() || ix.isAutocomplete()) && ix.commandName === this.name;
+  }
+
+  _build() {
+    return new SlashCommandBuilder().setName(this.name).setDescription(this.description);
+  }
+
+  async run(ix: ChatInputCommandInteraction | AutocompleteInteraction): Promise<void> {
+    if (ix.isAutocomplete()) {
+      const completions = await this.autocomplete(ix);
+      if (completions !== null) {
+        await ix.respond(completions);
+      }
+    } else if (ix.isChatInputCommand()) {
+      await this.execute(ix);
+    }
+  }
+
+  abstract execute(ix: ChatInputCommandInteraction): Promise<void>;
+  abstract autocomplete(ix: AutocompleteInteraction): Promise<ApplicationCommandOptionChoiceData[] | null>;
 }
 
 type Constructable<T, A extends unknown[]> = new (...args: A[]) => T;

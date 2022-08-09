@@ -66,7 +66,7 @@ export class UMichSocApiClient implements ISocApiClient {
       `/Terms/${termCode}/Schools/UM/Subjects/${course.subject}/CatalogNbrs/${course.number}`
     );
     const descr: string = res.data.getSOCCourseDescrResponse.CourseDescr;
-    return descr === "No Course Description found." ? null : descr.substring(0, descr.indexOf(" --- "));
+    return descr === "No Course Description found." ? null : descr;
   }
 
   private async refreshTokenIfNeeded() {
