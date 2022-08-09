@@ -27,13 +27,13 @@ export const classLookup: Module = {
         br.addStringOption((opt) =>
           opt
             .setName("course-code")
-            .setDescription('The course\'s code. Example: "UARTS 150"')
+            .setDescription('The course\'s code, like "UARTS 150"')
             .setRequired(true)
             .setAutocomplete(true)
         ).addIntegerOption((opt) =>
           opt
             .setName("section-number")
-            .setDescription("The desired section number. Example: 210")
+            .setDescription("The desired section number, like 210")
             .setRequired(true)
             .setAutocomplete(true)
         );
@@ -108,18 +108,19 @@ export const classLookup: Module = {
 async function buildEmbed(course: Course, section: Section<true>) {
   const descr = await umClient.fetchCourseDescription(course, termCodes["Fall 2022"]);
   const embed = new EmbedBuilder()
-    .setTitle(`${course.toString()}, Section ${section.number}`)
-    .setDescription(descr ?? "No course description available.")
-    .addFields(
-      section.meetings.map((mtg, i) => ({
-        name: `Meeting ${i + 1}`,
-        value: `${Array.from(mtg.days).join(", ")}\n${formatDuration(mtg.startTime)} to ${formatDuration(
-          mtg.endTime
-        )}\n${mtg.location ?? "TBA"}`,
-        inline: true,
-      }))
-    )
+    .setTitle(`${course.toString()}, ${section.type} Section ${section.number}`)
     .addFields([
+      {
+        name: `Meeting${section.meetings.length === 1 ? "" : "s"}`,
+        value: section.meetings
+          .map(
+            (mtg) =>
+              `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)} in ${
+                mtg.location === null ? "_unknown_" : formatLocation(mtg.location)
+              }`
+          )
+          .join("\n"),
+      },
       {
         name: "Enrollment",
         value: `${section.enrolled} / ${section.capacity} (${section.enrollStatus})`,
@@ -127,18 +128,52 @@ async function buildEmbed(course: Course, section: Section<true>) {
       },
     ]);
 
-  if (section.meetings.length === 1 && section.meetings[0].location !== null) {
-    const loc = locationOfFacility(section.meetings[0].location);
-    if (loc !== null) {
-      embed.setImage(
-        `https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-l+002277(${loc.lng},${loc.lat})/${loc.lng},${loc.lat},14.8,0/400x300@2x?access_token=${environment.mapboxToken}`
-      );
+  if (descr !== null) {
+    const { title, details } = splitDescription(descr);
+    embed.setAuthor({
+      name: title,
+      url: `https://atlas.ai.umich.edu/course/${encodeURIComponent(course.toString())}/`,
+      iconURL: "https://atlas.ai.umich.edu/static/images/logo/atlas-favicon-32x32.1292451fcaad.png",
+    });
+    if (details !== null) {
+      embed.setDescription(details);
     }
+  }
+
+  // We intend that two meetings, one at ARR and another at a resolved location, should not cause a static map to show up
+  const meetingLocations = section.meetings.map((mtg) =>
+    mtg.location === null ? null : locationOfFacility(mtg.location)
+  );
+  if (new Set(meetingLocations).size === 1 && meetingLocations[0] !== null) {
+    const loc = meetingLocations[0];
+    embed.setImage(
+      `https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-l+002277(${loc.lng},${loc.lat})/${loc.lng},${loc.lat},14.8,0/400x300@2x?access_token=${environment.mapboxToken}`
+    );
   }
   return embed;
 }
 
-function formatDuration(dur: Duration | null): string {
+function formatLocation(facility: string): string {
+  const loc = locationOfFacility(facility);
+  if (loc === null) return facility;
+  return stripMarkdownTag`[${facility}](https://www.google.com/maps/dir//${encodeURIComponent(loc.address)})`;
+}
+
+function splitDescription(description: string): { title: string; details: string | null } {
+  const knownSeparators = ["---", "\n\n"];
+  for (const sep of knownSeparators) {
+    const sepIndex = description.indexOf(sep);
+    if (sepIndex !== -1) {
+      return {
+        title: description.substring(0, sepIndex).trim(),
+        details: description.substring(sepIndex + sep.length).trim(),
+      };
+    }
+  }
+  return { title: description, details: null };
+}
+
+function formatTime(dur: Duration | null): string {
   if (dur === null) return "TBA";
   const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
   return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);

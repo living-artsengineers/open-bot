@@ -7,7 +7,7 @@ export enum Campus {
   Remote = "Remote",
 }
 
-export function locationOfFacility(facility: string): { lat: number; lng: number } | null {
+export function locationOfFacility(facility: string): { address: string; lat: number; lng: number } | null {
   for (const buildingCode of Object.keys(buildings)) {
     if (facility.includes(buildingCode)) {
       return buildings[buildingCode as keyof typeof buildings];
