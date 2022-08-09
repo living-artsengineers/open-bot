@@ -113,9 +113,14 @@ export abstract class AutocompletingSlashCommand extends InteractionCommand<
 
   async run(ix: ChatInputCommandInteraction | AutocompleteInteraction): Promise<void> {
     if (ix.isAutocomplete()) {
-      const completions = await this.autocomplete(ix);
-      if (completions !== null) {
-        await ix.respond(completions);
+      try {
+        const completions = await this.autocomplete(ix);
+        if (completions !== null) {
+          await ix.respond(completions);
+        }
+      } catch (e) {
+        console.error(e);
+        await ix.respond([]);
       }
     } else if (ix.isChatInputCommand()) {
       await this.execute(ix);

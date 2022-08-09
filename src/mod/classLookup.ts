@@ -8,13 +8,14 @@ import {
 import { DateTime, Duration } from "luxon";
 import { locationOfFacility } from "../campus/umCampus";
 import environment from "../environment";
-import { Course, Section } from "../soc/entities";
+import { Course, EnrollmentStatus, Section } from "../soc/entities";
 import { termCodes, UMichSocApiClient } from "../soc/umichApi";
 import { stripMarkdownTag } from "../utils";
 import { AutocompletingSlashCommand, Module } from "./module";
-import * as classCatalog from "../soc/sections-2410.json";
 
 const umClient = new UMichSocApiClient();
+// Change every term
+const defaultTerm: keyof typeof termCodes = "Fall 2022";
 
 export const classLookup: Module = {
   name: "classLookup",
@@ -30,21 +31,32 @@ export const classLookup: Module = {
             .setDescription('The course\'s code, like "UARTS 150"')
             .setRequired(true)
             .setAutocomplete(true)
-        ).addIntegerOption((opt) =>
-          opt
-            .setName("section-number")
-            .setDescription("The desired section number, like 210")
-            .setRequired(true)
-            .setAutocomplete(true)
-        );
+        )
+          .addIntegerOption((opt) =>
+            opt
+              .setName("section-number")
+              .setDescription("The desired section number, like 210")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName("term")
+              .setDescription(`Academic term in which to look up the section (current default: ${defaultTerm})`)
+              .addChoices(...Object.keys(termCodes).map((name) => ({ name, value: name })))
+              .setRequired(false)
+          );
       }
 
       async autocomplete(ix: AutocompleteInteraction): Promise<ApplicationCommandOptionChoiceData[] | null> {
+        const term = parseCleanIntendedTerm(ix);
+        const termCatalog = await getTermCatalog(termCodes[term]);
+
         const option = ix.options.getFocused(true);
         if (option.name === "course-code") {
           // Consider optimizing this
           const possibleCourse = Course.parse(option.value);
-          return Object.keys(classCatalog)
+          return Object.keys(termCatalog)
             .sort()
             .filter(
               (code) =>
@@ -56,8 +68,8 @@ export const classLookup: Module = {
         } else if (option.name === "section-number") {
           const course = Course.parse(ix.options.getString("course-code", true));
           if (course === null) return [];
-          if (!(course.toString() in classCatalog)) return [];
-          return classCatalog[course.toString() as keyof typeof classCatalog]
+          if (!(course.toString() in termCatalog)) return [];
+          return termCatalog[course.toString() as keyof typeof termCatalog]
             .filter((num) => num.toString().startsWith(option.value.replace(/^0+/g, "")))
             .map((section) => ({
               name: section.toString(),
@@ -80,7 +92,8 @@ export const classLookup: Module = {
             return;
           }
           const inputSection = ix.options.getInteger("section-number", true);
-          const section = await umClient.fetchSectionBySectionNumber(course, inputSection, termCodes["Fall 2022"]);
+          const term = parseCleanIntendedTerm(ix);
+          const section = await umClient.fetchSectionBySectionNumber(course, inputSection, termCodes[term]);
           if (section === null) {
             await ix.reply({
               ephemeral: true,
@@ -89,7 +102,7 @@ export const classLookup: Module = {
             return;
           }
 
-          const embed = await buildEmbed(course, section);
+          const embed = await buildEmbed(course, section, term);
           await ix.reply({
             embeds: [embed.toJSON()],
           });
@@ -105,28 +118,35 @@ export const classLookup: Module = {
   ],
 };
 
-async function buildEmbed(course: Course, section: Section<true>) {
+function parseCleanIntendedTerm(ix: ChatInputCommandInteraction | AutocompleteInteraction): keyof typeof termCodes {
+  const termRaw = ix.options.getString("term", false) ?? defaultTerm;
+  const term = Object.keys(termCodes).includes(termRaw) ? (termRaw as keyof typeof termCodes) : defaultTerm;
+  return term;
+}
+
+async function buildEmbed(course: Course, section: Section<true>, term: keyof typeof termCodes) {
   const descr = await umClient.fetchCourseDescription(course, termCodes["Fall 2022"]);
   const embed = new EmbedBuilder()
     .setTitle(`${course.toString()}: ${section.type} Section ${section.number}`)
-    .addFields([
+    .addFields(
       {
-        name: `Meeting${section.meetings.length === 1 ? "" : "s"}`,
-        value: section.meetings
-          .map(
-            (mtg) =>
-              `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)} in ${
-                mtg.location === null ? "_unknown_" : formatLocation(mtg.location)
-              }`
-          )
-          .join("\n"),
+        name: "Term",
+        value: term,
+        inline: true,
+      },
+      {
+        name: "Credits",
+        value: section.credits.toString(),
+        inline: true,
       },
       {
         name: "Enrollment",
-        value: `${section.enrolled} / ${section.capacity} (${section.enrollStatus})`,
+        value: `${enrollmentStatusSymbols[section.enrollStatus]} ${section.enrolled} / ${section.capacity} (${
+          section.enrollStatus
+        })`,
         inline: true,
-      },
-    ]);
+      }
+    );
 
   if (descr !== null) {
     const { title, details } = splitDescription(descr);
@@ -141,12 +161,33 @@ async function buildEmbed(course: Course, section: Section<true>) {
   }
 
   if (section.instructors.length > 0) {
+    // Apparently this is possible
+    const tooManyInstructors = section.instructors.length > 10;
     embed.addFields({
-      name: "Instructors",
-      value: section.instructors.map((instr) => `${instr.firstName} ${instr.lastName} (${instr.uniqname})`).join("\n"),
+      name: `Instructor${section.instructors.length === 1 ? "" : "s"}`,
+      value:
+        section.instructors
+          .slice(0, 10)
+          .map(
+            (instr) =>
+              `${instr.firstName} ${instr.lastName} ([${instr.uniqname}](https://atlas.ai.umich.edu/instructor/${instr.uniqname}/))`
+          )
+          .join("\n") + (tooManyInstructors ? "\n..." : ""),
       inline: true,
     });
   }
+
+  embed.addFields({
+    name: `Meeting${section.meetings.length === 1 ? "" : "s"}`,
+    value: section.meetings
+      .map(
+        (mtg) =>
+          `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)} in ${
+            mtg.location === null ? "_unknown_" : formatLocation(mtg.location)
+          }`
+      )
+      .join("\n"),
+  });
 
   // We intend that two meetings, one at ARR and another at a resolved location, should not cause a static map to show up
   const meetingLocations = section.meetings.map((mtg) =>
@@ -186,5 +227,15 @@ function formatTime(dur: Duration | null): string {
   const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
   return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);
 }
+
+async function getTermCatalog(term: number): Promise<{ [code: string]: number[] }> {
+  return await import(`../soc/sections-${term}.json`);
+}
+
+const enrollmentStatusSymbols = {
+  [EnrollmentStatus.Open]: ":green_circle:",
+  [EnrollmentStatus.WaitList]: ":yellow_circle:",
+  [EnrollmentStatus.Closed]: ":red_circle:",
+};
 
 export default classLookup;
