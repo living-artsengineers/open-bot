@@ -19,10 +19,11 @@ model Message {
 }
 
 model User {
-  id       BigInt    @id
-  username String
-  messages Message[]
-  quotes   Quote[]
+  id          BigInt       @id
+  username    String
+  messages    Message[]
+  quotes      Quote[]
+  enrollments Enrollment[]
 }
 
 model Conversation {
@@ -39,4 +40,15 @@ model Quote {
 
   speakerId      BigInt
   conversationId Int
+}
+
+model Enrollment {
+  id         Int    @id @default(autoincrement())
+  student    User   @relation(fields: [studentId], references: [id])
+  courseCode String
+  section    Int
+  // 2370, 2410, etc. (dictated by the UM SOC API)
+  term       Int
+
+  studentId BigInt
 }
