@@ -97,7 +97,7 @@ export const classLookup: Module = {
           if (section === null) {
             await ix.reply({
               ephemeral: true,
-              content: stripMarkdownTag`:x: Section ${inputSection} of ${course.toString()} does not exist.`,
+              content: stripMarkdownTag`:x: Section ${inputSection} of ${course.toString()} does not exist during ${term}.`,
             });
             return;
           }
@@ -155,7 +155,7 @@ async function buildEmbed(course: Course, section: Section<true>, term: keyof ty
       url: `https://atlas.ai.umich.edu/course/${encodeURIComponent(course.toString())}/`,
       iconURL: "https://atlas.ai.umich.edu/static/images/logo/atlas-favicon-32x32.1292451fcaad.png",
     });
-    if (details !== null) {
+    if (details !== null && details.length > 0) {
       embed.setDescription(details);
     }
   }
@@ -179,14 +179,17 @@ async function buildEmbed(course: Course, section: Section<true>, term: keyof ty
 
   embed.addFields({
     name: `Meeting${section.meetings.length === 1 ? "" : "s"}`,
-    value: section.meetings
-      .map(
-        (mtg) =>
-          `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)} in ${
-            mtg.location === null ? "_unknown_" : formatLocation(mtg.location)
-          }`
-      )
-      .join("\n"),
+    value:
+      section.meetings.length === 0
+        ? "None"
+        : section.meetings
+            .map(
+              (mtg) =>
+                `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(
+                  mtg.endTime
+                )} in ${mtg.location === null ? "_unknown_" : formatLocation(mtg.location)}`
+            )
+            .join("\n"),
   });
 
   // We intend that two meetings, one at ARR and another at a resolved location, should not cause a static map to show up

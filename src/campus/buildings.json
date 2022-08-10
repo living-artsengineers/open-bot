@@ -1139,5 +1139,12 @@
     "lat": 42.2785,
     "lng": -83.7339,
     "name": "Central Campus Classroom Building"
+  },
+  "FMCRB": {
+    "address": "2505 Hayward Street Ann Arbor, MI 48109",
+    "id": "fmcrb",
+    "lat": 42.2943,
+    "lng": -83.7097,
+    "name": "Ford Robotics Building"
   }
 }

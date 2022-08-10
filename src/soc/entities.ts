@@ -73,7 +73,7 @@ export enum SectionType {
    */
   MID = "MID",
   /**
-   * Independent research
+   * Independent
    */
   IND = "IND",
 }
