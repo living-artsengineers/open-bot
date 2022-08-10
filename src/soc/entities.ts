@@ -16,9 +16,9 @@ export class Course {
      */
     public readonly number: number
   ) {
-    devAssert(subject.trim().toUpperCase() === subject);
-    devAssert(Math.floor(number) === number);
-    devAssert(number > 0 && number < 1000);
+    devAssert(subject.trim().toUpperCase() === subject, "Course subject must be all uppercase and trimmed");
+    devAssert(Math.floor(number) === number, "Course number must be an integer");
+    devAssert(number > 99 && number < 1000, "Course number must be between 100 and 999");
   }
 
   static parse(str: string): Course | null {

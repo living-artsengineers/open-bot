@@ -145,6 +145,7 @@ test("Parse Sections response", () => {
       Instructors: "Coppola,Brian P",
     },
     Instructor: {
+      InstructorName: "Coppola,Brian P",
       Uniqname: "BCOPPOLA",
       FirstName: "Brian",
       LastName: "Coppola",

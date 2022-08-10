@@ -9,13 +9,11 @@ import { DateTime, Duration } from "luxon";
 import { locationOfFacility } from "../campus/umCampus";
 import environment from "../environment";
 import { Course, EnrollmentStatus, Section } from "../soc/entities";
-import { termCodes, UMichSocApiClient } from "../soc/umichApi";
+import { termCodes } from "../soc/umichApi";
 import { stripMarkdownTag } from "../utils";
 import { AutocompletingSlashCommand, Module } from "./module";
-
-const umClient = new UMichSocApiClient();
-// Change every term
-const defaultTerm: keyof typeof termCodes = "Fall 2022";
+import { sharedClient as umClient } from "../soc/umichApi";
+import { splitDescription, defaultTerm } from "../soc/umich";
 
 export const classLookup: Module = {
   name: "classLookup",
@@ -109,7 +107,7 @@ export const classLookup: Module = {
         } catch (e) {
           await ix.reply({
             ephemeral: true,
-            content: "Something went wrong: " + e,
+            content: `Something went wrong: \`\`\`${e}\`\`\``,
           });
           console.error(e);
         }
@@ -118,14 +116,16 @@ export const classLookup: Module = {
   ],
 };
 
-function parseCleanIntendedTerm(ix: ChatInputCommandInteraction | AutocompleteInteraction): keyof typeof termCodes {
+export function parseCleanIntendedTerm(
+  ix: ChatInputCommandInteraction | AutocompleteInteraction
+): keyof typeof termCodes {
   const termRaw = ix.options.getString("term", false) ?? defaultTerm;
   const term = Object.keys(termCodes).includes(termRaw) ? (termRaw as keyof typeof termCodes) : defaultTerm;
   return term;
 }
 
 async function buildEmbed(course: Course, section: Section<true>, term: keyof typeof termCodes) {
-  const descr = await umClient.fetchCourseDescription(course, termCodes["Fall 2022"]);
+  const descr = await umClient.getCourseDescription(course, termCodes[term]);
   const embed = new EmbedBuilder()
     .setTitle(`${course.toString()}: ${section.type} Section ${section.number}`)
     .addFields(
@@ -151,7 +151,7 @@ async function buildEmbed(course: Course, section: Section<true>, term: keyof ty
   if (descr !== null) {
     const { title, details } = splitDescription(descr);
     embed.setAuthor({
-      name: title,
+      name: title.substring(0, 256),
       url: `https://atlas.ai.umich.edu/course/${encodeURIComponent(course.toString())}/`,
       iconURL: "https://atlas.ai.umich.edu/static/images/logo/atlas-favicon-32x32.1292451fcaad.png",
     });
@@ -211,21 +211,7 @@ function formatLocation(facility: string): string {
   return stripMarkdownTag`[${facility}](https://www.google.com/maps/dir//${encodeURIComponent(loc.address)})`;
 }
 
-function splitDescription(description: string): { title: string; details: string | null } {
-  const knownSeparators = ["---", "\n\n"];
-  for (const sep of knownSeparators) {
-    const sepIndex = description.indexOf(sep);
-    if (sepIndex !== -1) {
-      return {
-        title: description.substring(0, sepIndex).trim(),
-        details: description.substring(sepIndex + sep.length).trim(),
-      };
-    }
-  }
-  return { title: description, details: null };
-}
-
-function formatTime(dur: Duration | null): string {
+export function formatTime(dur: Duration | null): string {
   if (dur === null) return "TBA";
   const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
   return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);

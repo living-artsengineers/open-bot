@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits } from "discord.js";
 import env from "./environment";
 import modules from "./mod/registry";
+import { stripMarkdownTag } from "./utils";
 
 async function main() {
   const client = new Client({
@@ -30,7 +31,17 @@ async function main() {
         intx.reply({ ephemeral: true, content: checkResult });
         return;
       }
-      await handler.run(intx);
+      try {
+        await handler.run(intx);
+      } catch (e) {
+        console.error(e);
+        if (intx.isRepliable()) {
+          intx.reply({
+            ephemeral: true,
+            content: stripMarkdownTag`Something went wrong on my end. Sorry!\n\`\`\`${e}\`\`\``,
+          });
+        }
+      }
     }
   });
 

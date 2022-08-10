@@ -21,3 +21,9 @@ export function devAssert(condition: boolean, message?: string | Error | undefin
     assert(condition, message);
   }
 }
+
+export function zeroPad(num: number): string {
+  let out = num.toString();
+  while (out.length < 3) out = "0" + out;
+  return out;
+}
