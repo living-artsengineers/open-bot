@@ -7,10 +7,16 @@ interface Environment {
   guild: string;
   clientId: string;
   token: string;
+  umApi: {
+    clientId: string;
+    clientSecret: string;
+  };
+  mapboxToken: string;
   name: keyof typeof envConfig;
 }
 
 export default {
+  ...envConfig,
   ...envConfig[activeEnv],
   name: activeEnv,
 } as Environment;
