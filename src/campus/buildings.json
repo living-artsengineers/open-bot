@@ -1146,5 +1146,12 @@
     "lat": 42.2943,
     "lng": -83.7097,
     "name": "Ford Robotics Building"
+  },
+  "WEISER": {
+    "address": "500 Church Street Ann Arbor, MI 48109",
+    "id": "weiser",
+    "lat": 42.276624,
+    "lng": -83.735146,
+    "name": "Weiser Hall"
   }
 }
