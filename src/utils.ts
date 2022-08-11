@@ -1,4 +1,4 @@
-import assert = require("assert");
+import { strict as assert } from "assert";
 import { Client } from "discord.js";
 import environment from "./environment";
 

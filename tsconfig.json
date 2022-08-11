@@ -2,6 +2,9 @@
   "compilerOptions": {
     "lib": ["ESNext", "ES2020"],
     "strict": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "module": "CommonJS",
+    "target": "ES2020"
   }
 }

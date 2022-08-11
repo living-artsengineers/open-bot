@@ -4,7 +4,7 @@ import axios, { AxiosInstance } from "axios";
 import { Course, EnrollmentStatus, Meeting, Section, SectionType, Weekday } from "./entities";
 
 export interface ISocApiClient {
-  fetchSectionBySectionNumber(course: Course, sectionNumber: number, termCode: number): Promise<Section<true> | null>;
+  getSectionBySectionNumber(course: Course, sectionNumber: number, termCode: number): Promise<Section<true> | null>;
   fetchSectionByClassNumber(classNumber: number, termCode: number): Promise<[Section<true>, Course] | null>;
   fetchAllSections(course: Course, termCode: number): Promise<Section<false>[]>;
   getCourseDescription(course: Course, termCode: number): Promise<string | null>;
@@ -21,8 +21,9 @@ const endpointPrefix = "https://apigw.it.umich.edu/um/Curriculum/SOC";
 export class UMichSocApiClient implements ISocApiClient {
   private accessToken: { value: string; expireAt: DateTime } | null = null;
   private axios: AxiosInstance = axios.create({ baseURL: endpointPrefix });
-  // a null in the cache means that the course catalog doesn't have that value (don't ask them again)
-  private cache: { [termCode: number]: { courseDescription: { [course: string]: string | null } } } = {};
+  // a null in the cache means that the course catalog doesn't have that value (don't ask for it again)
+  private descriptionCache: { [term: number]: { [course: string]: string | null } } = {};
+  private sectionCache: { [term: number]: { [course: string]: { [section: number]: Section<true> | null } } } = {};
 
   async fetchAllSections(course: Course, termCode: number): Promise<Section[]> {
     await this.refreshTokenIfNeeded();
@@ -32,6 +33,24 @@ export class UMichSocApiClient implements ISocApiClient {
     const sections = res.data.getSOCSectionsResponse.Section;
     if (sections === undefined) return [];
     return (<SectionJson[]>arrayify(sections)).map(parseSection);
+  }
+
+  async getSectionBySectionNumber(
+    course: Course,
+    sectionNumber: number,
+    termCode: number
+  ): Promise<Section<true> | null> {
+    const cached = this.sectionCache[termCode]?.[course.toString()]?.[sectionNumber];
+    if (cached !== undefined) {
+      return cached;
+    }
+    const section = await this.fetchSectionBySectionNumber(course, sectionNumber, termCode);
+    // This careful walking into nested objects is repetitive and deserves a utility function
+    if (this.sectionCache[termCode] === undefined) this.sectionCache[termCode] = {};
+    if (this.sectionCache[termCode][course.toString()] === undefined)
+      this.sectionCache[termCode][course.toString()] = {};
+    this.sectionCache[termCode][course.toString()][sectionNumber] = section;
+    return section;
   }
 
   async fetchSectionBySectionNumber(
@@ -65,12 +84,12 @@ export class UMichSocApiClient implements ISocApiClient {
   }
 
   async getCourseDescription(course: Course, termCode: number): Promise<string | null> {
-    const cached = this.cache[termCode]?.courseDescription?.[course.toString()];
+    const cached = this.descriptionCache[termCode]?.[course.toString()];
     if (cached !== undefined) return cached;
     const fetched = await this.fetchCourseDescription(course, termCode);
 
-    if (!(termCode in this.cache)) this.cache[termCode] = { courseDescription: {} };
-    this.cache[termCode].courseDescription[course.toString()] = fetched;
+    if (this.descriptionCache[termCode] === undefined) this.descriptionCache[termCode] = {};
+    this.descriptionCache[termCode][course.toString()] = fetched;
     return fetched;
   }
 

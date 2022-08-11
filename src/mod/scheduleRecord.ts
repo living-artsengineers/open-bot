@@ -1,9 +1,13 @@
 import {
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChatInputCommandInteraction,
+  ComponentType,
   EmbedBuilder,
   EmbedField,
   ModalBuilder,
+  SelectMenuBuilder,
   SlashCommandBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -15,44 +19,202 @@ import { fetchGuildNickname, stripMarkdown, stripMarkdownTag, zeroPad } from "..
 import { Module, SlashCommand } from "./module";
 import { sharedClient } from "../soc/umichApi";
 import { formatTime, parseCleanIntendedTerm } from "./classLookup";
+import { setTimeout as wait } from "timers/promises";
 import { defaultTerm, splitDescription } from "../soc/umich";
+import { strict as assert } from "assert";
+
+const ephemeralMessageLifetime = 1000 * 60 * 15;
+let activeScheduleDisplays: {
+  userId: string;
+  term: number;
+  interaction: ChatInputCommandInteraction;
+  expire: Date;
+}[] = [];
 
 const scheduleRecord: Module = {
   name: "scheduleRecord",
+  async setup(client) {
+    // schedule-setup's modal submissions
+    client.on("interactionCreate", async (intx) => {
+      if (intx.isButton()) {
+        const tokens = intx.customId.split(":");
+        if (tokens[0] === "schedule-add-section-button") {
+          const term = tokens[1] as keyof typeof termCodes;
+          assert(Object.keys(termCodes).includes(term));
+          const modal = new ModalBuilder()
+            .setCustomId(`schedule-add-section-submit:${term}`)
+            .setTitle(`Add section for ${term}`);
+
+          modal.addComponents(
+            new ActionRowBuilder({
+              components: [
+                new TextInputBuilder({
+                  customId: "courseCode",
+                  label: "Course code",
+                  style: TextInputStyle.Short,
+                  required: true,
+                  placeholder: 'Example: "UARTS 150"',
+                }),
+              ],
+            }),
+            new ActionRowBuilder({
+              components: [
+                new TextInputBuilder({
+                  customId: "section",
+                  label: "Section number",
+                  style: TextInputStyle.Short,
+                  required: true,
+                  placeholder: 'Example: "210"',
+                }),
+              ],
+            })
+          );
+
+          await intx.showModal(modal);
+        } else if (tokens[0] === "schedule-remove-section-button") {
+          const term = tokens[1] as keyof typeof termCodes;
+          assert(Object.keys(termCodes).includes(term));
+
+          const enrollments = await getEnrollments(BigInt(intx.user.id), termCodes[term]);
+
+          await intx.reply({
+            ephemeral: true,
+            content: `Pick a class section to remove from your ${term} schedule.`,
+            components: [
+              new ActionRowBuilder<SelectMenuBuilder>({
+                components: [
+                  new SelectMenuBuilder({
+                    customId: `schedule-remove-section-submit:${term}`,
+                    options: enrollments.map((enr) => {
+                      // Showing days only because some meeting descriptions are too long for Discord
+                      const days = enr[0].meetings
+                        .map((mtg) => mtg.days)
+                        .reduce((a, b) => new Set([...a, ...b]), new Set());
+                      return {
+                        label: `${enr[1].toString()} Section ${zeroPad(enr[0].number)} (${enr[0].type})`,
+                        description: days.size === 0 ? undefined : Array.from(days).join(", "),
+                        // format: [course, section number] to ease database operation
+                        value: JSON.stringify([enr[1].toString(), enr[0].number]),
+                      };
+                    }),
+                  }),
+                ],
+              }),
+            ],
+          });
+        }
+      } else if (intx.isModalSubmit()) {
+        const tokens = intx.customId.split(":");
+        if (tokens[0] === "schedule-add-section-submit") {
+          const term = tokens[1] as keyof typeof termCodes;
+          assert(Object.keys(termCodes).includes(term));
+          const course = Course.parse(intx.fields.getTextInputValue("courseCode"));
+          const section = Number(intx.fields.getTextInputValue("section"));
+
+          if (course === null) {
+            await intx.reply({
+              ephemeral: true,
+              content: stripMarkdownTag`:x: \`${intx.fields.getTextInputValue(
+                "courseCode"
+              )}\` is not a properly formatted course code.`,
+            });
+            return;
+          }
+          if (isNaN(section) || section - Math.floor(section) > 1e-6) {
+            await intx.reply({
+              ephemeral: true,
+              content: stripMarkdownTag`:x: \`${intx.fields.getTextInputValue("section")}\` is not an integer.`,
+            });
+            return;
+          }
+
+          const sectionInfo = await sharedClient.getSectionBySectionNumber(course, section, termCodes[term]);
+          if (sectionInfo === null) {
+            await intx.reply({
+              ephemeral: true,
+              content: `:x: That section does not exist during ${term}.\n_Note: Do not put midterm sections (type "MID") into your schedule here._`,
+            });
+            return;
+          }
+
+          await ensureUserExists(
+            intx.user.id,
+            (await fetchGuildNickname(intx.client, intx.user.id)) ?? intx.user.username
+          );
+          await addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
+          await intx.reply({
+            ephemeral: true,
+            content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${
+              sectionInfo.type
+            }) to your ${term} schedule.`,
+          });
+          await updateDisplayedSchedules(intx.user.id, term);
+        }
+      } else if (intx.isSelectMenu()) {
+        const tokens = intx.customId.split(":");
+        if (tokens[0] === "schedule-remove-section-submit") {
+          const term = tokens[1] as keyof typeof termCodes;
+          if (!Object.keys(termCodes).includes(term)) return;
+          const [courseRaw, sectionNumberRaw] = JSON.parse(intx.values[0]);
+          const course = Course.parse(courseRaw);
+          if (course === null) return;
+          const sectionNumber = parseInt(sectionNumberRaw);
+          if (isNaN(sectionNumber)) return;
+
+          await removeEnrollment(BigInt(intx.user.id), termCodes[term], course, sectionNumber);
+
+          await intx.update({
+            content: `:white_check_mark: Successfully removed ${course}, section ${zeroPad(
+              sectionNumber
+            )} from your ${term} schedule.`,
+            components: [],
+          });
+          await updateDisplayedSchedules(intx.user.id, term);
+        }
+      }
+    });
+  },
   commands: [
-    class extends SlashCommand {
-      name = "schedule-setup";
-      description = "Interactively add classes to your schedule";
+    class ScheduleCommand extends SlashCommand {
+      name = "schedule";
+      description = "See and edit your class schedule";
+
+      build(bx: SlashCommandBuilder) {
+        bx.addStringOption((opt) =>
+          opt
+            .setName("term")
+            .setDescription("The academic term of the schedule to see and edit. Current default: " + defaultTerm)
+            .setChoices(...Object.keys(termCodes).map((name) => ({ name, value: name })))
+            .setRequired(false)
+        );
+      }
 
       async run(ix: ChatInputCommandInteraction) {
-        const modal = new ModalBuilder().setCustomId("schedule-recorder").setTitle("Add section");
+        await ix.deferReply({ ephemeral: true });
+        await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
+        const term = parseCleanIntendedTerm(ix);
+        const classes = await getEnrollments(BigInt(ix.user.id), termCodes[term]);
+        const actionRow = scheduleEditActionRow(classes, term);
 
-        modal.addComponents(
-          new ActionRowBuilder({
-            components: [
-              new TextInputBuilder({
-                customId: "courseCode",
-                label: "Course code",
-                style: TextInputStyle.Short,
-                required: true,
-                placeholder: 'Example: "UARTS 150"',
-              }),
-            ],
-          }),
-          new ActionRowBuilder({
-            components: [
-              new TextInputBuilder({
-                customId: "section",
-                label: "Section number",
-                style: TextInputStyle.Short,
-                required: true,
-                placeholder: 'Example: "210"',
-              }),
-            ],
-          })
-        );
+        await ix.editReply({
+          embeds: [await scheduleEmbed(classes, term)],
+          components: [actionRow],
+        });
 
-        await ix.showModal(modal);
+        activeScheduleDisplays.push({
+          userId: ix.user.id,
+          term: termCodes[term],
+          interaction: ix,
+          expire: new Date(Date.now() + ephemeralMessageLifetime),
+        });
+        // Wait for this interaction to time out.
+        // Other interactions can edit this interaction's reply to reflect changes in the meantime.
+        await wait(ephemeralMessageLifetime);
+        await ix.editReply({
+          content: `This interaction has expired. Run \`/schedule\` again to view and edit your ${term} schedule.`,
+        });
+
+        activeScheduleDisplays = activeScheduleDisplays.filter((x) => x.interaction !== ix);
       }
     },
     class extends SlashCommand {
@@ -86,7 +248,8 @@ const scheduleRecord: Module = {
         if (numbers.length < 2) {
           return (
             `:x: Too few classes (2 minimum, ${numbers.length} supplied). ` +
-            `This command sets your entire schedule for a term. It does not just add the classes you specify---it removes all those you don't specify.`
+            `This command sets your entire schedule for a term. It does not just add the classes you specify---it removes all those you don't specify.\n` +
+            `To clear your schedule, use \`/schedule-clear\`.`
           );
         }
         if (numbers.length > 20) {
@@ -138,13 +301,15 @@ const scheduleRecord: Module = {
               content: `${done ? "Finished setting your schedule." : "Resolving classes..."}\n${body}`.substring(
                 0,
                 1024
-              ), // Discord message size limit, exceedable if you have >13 classes or so
+              ),
               embeds: done
                 ? [await scheduleEmbed(progressData.filter(Array.isArray) as [Section<true>, Course][], term)]
                 : [],
             });
 
-            if (!done) {
+            if (done) {
+              await updateDisplayedSchedules(ix.user.id, term);
+            } else {
               setTimeout(replyUpdates, 250);
             }
           } catch (e) {
@@ -183,8 +348,90 @@ const scheduleRecord: Module = {
         );
       }
     },
+    class ScheduleClearCommand extends SlashCommand {
+      name = "schedule-clear";
+      description = "Clears your entire schedule for a given term.";
+      build(builder: SlashCommandBuilder) {
+        builder.addStringOption((opt) =>
+          opt
+            .setName("term")
+            .setDescription(
+              `The academic term for which you want to clear your schedule. Current default: ${defaultTerm}`
+            )
+            .setChoices(...Object.keys(termCodes).map((name) => ({ name, value: name })))
+            .setRequired(false)
+        );
+      }
+
+      async run(ix: ChatInputCommandInteraction) {
+        const term = parseCleanIntendedTerm(ix);
+        await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
+        await ix.reply({
+          ephemeral: true,
+          content: `Successfully cleared your schedule for ${term}.`,
+        });
+        await updateDisplayedSchedules(ix.user.id, term);
+      }
+    },
   ],
 };
+
+async function updateDisplayedSchedules(userId: string, term: keyof typeof termCodes) {
+  await Promise.all(
+    activeScheduleDisplays
+      .filter((disp) => disp.userId === userId && disp.term === termCodes[term])
+      .map(async (disp) => {
+        const enrollments = await getEnrollments(BigInt(userId), termCodes[term]);
+        disp.interaction.editReply({
+          embeds: [await scheduleEmbed(enrollments, term)],
+          components: [scheduleEditActionRow(enrollments, term)],
+        });
+      })
+  );
+}
+
+function scheduleEditActionRow(classes: unknown[], term: keyof typeof termCodes) {
+  return new ActionRowBuilder<ButtonBuilder>({
+    components: [
+      {
+        type: ComponentType.Button,
+        customId: `schedule-add-section-button:${term}`,
+        label: "Add class",
+        emoji: "➕",
+        style: ButtonStyle.Primary,
+        disabled: classes.length >= 20,
+      },
+      {
+        type: ComponentType.Button,
+        customId: `schedule-remove-section-button:${term}`,
+        label: "Remove class",
+        emoji: "➖",
+        style: ButtonStyle.Danger,
+        disabled: classes.length === 0,
+      },
+    ],
+  });
+}
+
+async function getEnrollments(user: bigint, term: number): Promise<[Section<true>, Course][]> {
+  const rows = await client.enrollment.findMany({
+    where: {
+      studentId: user,
+      term,
+    },
+    select: {
+      courseCode: true,
+      section: true,
+    },
+  });
+  return await Promise.all(
+    rows.map(async ({ courseCode, section }) => {
+      const course = Course.parse(courseCode);
+      assert(course !== null, `Invalid course stored in database: ${courseCode}`);
+      return [await sharedClient.getSectionBySectionNumber(course, section, term), course] as [Section<true>, Course];
+    })
+  );
+}
 
 async function clearEnrollment(user: bigint, term: number) {
   await client.enrollment.deleteMany({
@@ -208,15 +455,27 @@ async function addEnrollment(user: bigint, term: number, course: Course, section
   await client.enrollment.create({ data: rowData });
 }
 
+async function removeEnrollment(user: bigint, term: number, course: Course, section: number) {
+  await client.enrollment.deleteMany({
+    where: {
+      studentId: user,
+      term,
+      courseCode: course.toString(),
+      section,
+    },
+  });
+}
+
 export default scheduleRecord;
+
+function meetingToLine(mtg: Meeting<true>) {
+  return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${
+    mtg.location === null ? "" : ` in ${mtg.location}`
+  }\n`;
+}
 
 async function scheduleEmbed(classes: [Section<true>, Course][], term: keyof typeof termCodes): Promise<EmbedBuilder> {
   async function classToField([section, course]: [Section<true>, Course]): Promise<EmbedField> {
-    function meetingToLine(mtg: Meeting<true>) {
-      return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${
-        mtg.location === null ? "" : ` in ${mtg.location}`
-      }\n`;
-    }
     const instructorList =
       section.instructors.length === 0
         ? "No known instructors"
@@ -238,6 +497,8 @@ async function scheduleEmbed(classes: [Section<true>, Course][], term: keyof typ
 
   return new EmbedBuilder({
     title: `Your ${term} Schedule`,
+    description:
+      classes.length === 0 ? 'Your schedule is empty. Click ":heavy_plus_sign: Add class" to add a class.' : undefined,
     fields: await Promise.all(classes.map(classToField)),
   });
 }

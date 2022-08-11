@@ -91,7 +91,7 @@ export const classLookup: Module = {
           }
           const inputSection = ix.options.getInteger("section-number", true);
           const term = parseCleanIntendedTerm(ix);
-          const section = await umClient.fetchSectionBySectionNumber(course, inputSection, termCodes[term]);
+          const section = await umClient.getSectionBySectionNumber(course, inputSection, termCodes[term]);
           if (section === null) {
             await ix.reply({
               ephemeral: true,
