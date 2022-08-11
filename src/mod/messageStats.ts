@@ -8,13 +8,20 @@ const messageStats: Module = {
     client.on("messageCreate", async (msg) => {
       if (!msg.inGuild()) return;
       await ensureUserExists(msg.author.id, msg.member?.nickname ?? msg.author.username);
-      await db.message.create({
-        data: {
+      const row = {
+        author: BigInt(msg.author.id),
+        length: msg.content.trim().length,
+        channel: BigInt(msg.channelId),
+        time: new Date(),
+      };
+      await db.message.upsert({
+        create: {
           id: Number(msg.id),
-          author: BigInt(msg.author.id),
-          length: msg.content.trim().length,
-          channel: BigInt(msg.channelId),
-          time: new Date(),
+          ...row,
+        },
+        update: row,
+        where: {
+          id: Number(msg.id),
         },
       });
     });
