@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad } from "./utils";
+import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad, reverseLookup } from "./utils";
 
 test("stripMarkdown", () => {
   const cases = {
@@ -54,4 +54,15 @@ test("truncateText", () => {
   expect(truncateText("aaaaaaaaaaaaaaaaaaaaaaaaa", 4)).toEqual("…");
   expect(truncateText(law406, 9000)).toEqual(law406);
   expect(truncateText("hello", 5)).toEqual("hello");
+});
+
+test("reverseLookup", () => {
+  const obj = {
+    a: 2,
+    b: 3,
+    j: 10,
+  };
+  expect(reverseLookup(obj, 3)).toEqual("a");
+  expect(reverseLookup(obj, 10)).toEqual("j");
+  expect(reverseLookup(obj, 1)).toBeNull();
 });

@@ -15,7 +15,7 @@ import {
 import { Course, Meeting, Section, SectionType } from "../soc/entities";
 import { termCodes } from "../soc/umichApi";
 import client, { ensureUserExists } from "../storage";
-import { fetchGuildNickname, stripMarkdown, stripMarkdownTag, truncateText, zeroPad } from "../utils";
+import { fetchGuildNickname, reverseLookup, stripMarkdown, stripMarkdownTag, truncateText, zeroPad } from "../utils";
 import { Module, SlashCommand } from "./module";
 import { sharedClient } from "../soc/umichApi";
 import { formatTime, parseCleanIntendedTerm } from "./classLookup";
@@ -109,6 +109,33 @@ const scheduleRecord: Module = {
               }),
             ],
           });
+        } else if (tokens[0] === "schedule-peers-button") {
+          const term = tokens[1] as keyof typeof termCodes;
+          if (!Object.keys(termCodes).includes(term)) return;
+          const termCode = termCodes[term];
+          // FIXME Not optimal: Only check for presence. Don't fetch all of them.
+          if ((await getEnrollments(BigInt(intx.user.id), termCode)).length === 0) {
+            await intx.reply({
+              ephemeral: true,
+              content: `:x: Your ${term} schedule is empty. Use \`/schedule\` or \`/schedule-set-classes\` to add classes to it.`,
+            });
+            return;
+          }
+          const studentId = BigInt(intx.user.id);
+          const [coursemates, classmates, alumni] = await Promise.all([
+            getCoursemates(studentId, termCode),
+            getSectionPeers(studentId, termCode),
+            getCourseAlumni(studentId, termCode),
+          ]);
+          const peerInfo: PeerInfo = {
+            coursemates,
+            classmates,
+            alumni,
+          };
+          await intx.reply({
+            ephemeral: true,
+            embeds: await peerEmbeds(peerInfo, term),
+          });
         }
       } else if (intx.isModalSubmit()) {
         const tokens = intx.customId.split(":");
@@ -201,7 +228,7 @@ const scheduleRecord: Module = {
         await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
         const term = parseCleanIntendedTerm(ix);
         const classes = await getEnrollments(BigInt(ix.user.id), termCodes[term]);
-        const actionRow = scheduleEditActionRow(classes, term);
+        const actionRow = scheduleActionRow(classes, term);
 
         await ix.editReply({
           embeds: [await scheduleEmbed(classes, term)],
@@ -391,13 +418,13 @@ async function updateDisplayedSchedules(userId: string, term: keyof typeof termC
         const enrollments = await getEnrollments(BigInt(userId), termCodes[term]);
         disp.interaction.editReply({
           embeds: [await scheduleEmbed(enrollments, term)],
-          components: [scheduleEditActionRow(enrollments, term)],
+          components: [scheduleActionRow(enrollments, term)],
         });
       })
   );
 }
 
-function scheduleEditActionRow(classes: unknown[], term: keyof typeof termCodes) {
+function scheduleActionRow(classes: unknown[], term: keyof typeof termCodes) {
   return new ActionRowBuilder<ButtonBuilder>({
     components: [
       {
@@ -407,6 +434,14 @@ function scheduleEditActionRow(classes: unknown[], term: keyof typeof termCodes)
         emoji: "➕",
         style: ButtonStyle.Primary,
         disabled: classes.length >= 20,
+      },
+      {
+        type: ComponentType.Button,
+        customId: `schedule-peers-button:${term}`,
+        label: "Find peers",
+        emoji: "🔍",
+        style: ButtonStyle.Secondary,
+        disabled: classes.length === 0,
       },
       {
         type: ComponentType.Button,
@@ -473,34 +508,40 @@ async function removeEnrollment(user: bigint, term: number, course: Course, sect
   });
 }
 
-async function getCoursemates(user: bigint, term: number): Promise<{ [course: string]: bigint[] }> {
-  const allCoursemates: { courseCode: string; studentId: bigint }[] =
-    await client.$queryRaw`SELECT p.courseCode, p.studentId FROM Enrollment p WHERE p.studentId <> ${user} AND p.term = ${term} AND
-      EXISTS (SELECT 1 FROM Enrollment s WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term)`;
+interface PeerInfo {
+  coursemates: { [course: string]: bigint[] };
+  classmates: { [course: string]: { id: bigint; section: number }[] };
+  alumni: { [course: string]: { id: bigint; term: number }[] };
+}
+
+async function getCoursemates(user: bigint, term: number): Promise<PeerInfo["coursemates"]> {
+  const allCoursemates: { courseCode: string; studentId: bigint }[] = await client.$queryRaw`
+    SELECT p.courseCode, p.studentId FROM Enrollment p
+      WHERE p.studentId != ${user} AND p.term = ${term} AND
+      EXISTS (SELECT 1 FROM Enrollment s
+        WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term)`;
 
   return rollUpAsObjectOfArrays(allCoursemates.map((mate) => [mate.courseCode, mate.studentId]));
 }
 
-async function getSectionPeers(
-  user: bigint,
-  term: number
-): Promise<{ [course: string]: { id: bigint; section: number }[] }> {
-  const allSectionPeers: { courseCode: string; section: number; studentId: bigint }[] =
-    await client.$queryRaw`SELECT p.courseCode, p.section, p.studentId FROM Enrollment p WHERE p.studentId <> ${user} AND p.term = ${term} AND
-      EXISTS (SELECT 1 FROM Enrollment s WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term AND p.section = s.section)`;
+async function getSectionPeers(user: bigint, term: number): Promise<PeerInfo["classmates"]> {
+  const allSectionPeers: { courseCode: string; section: number; studentId: bigint }[] = await client.$queryRaw`
+    SELECT p.courseCode, p.section, p.studentId FROM Enrollment p
+      WHERE p.studentId != ${user} AND p.term = ${term} AND
+      EXISTS (SELECT 1 FROM Enrollment s
+      WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term AND p.section = s.section)`;
 
   return rollUpAsObjectOfArrays(
     allSectionPeers.map((mate) => [mate.courseCode, { id: mate.studentId, section: mate.section }])
   );
 }
 
-async function getCourseAlumni(
-  user: bigint,
-  term: number
-): Promise<{ [course: string]: { id: bigint; term: number }[] }> {
-  const alumniList: { studentId: bigint; courseCode: string; term: number }[] =
-    await client.$queryRaw`SELECT e.studentId, e.courseCode, e.term FROM Enrollment e WHERE e.studentId <> ${user} AND e.term < ${term} AND
-      EXISTS (SELECT 1 FROM Enrollment f WHERE f.studentId = ${user} AND e.courseCode = f.courseCode AND f.term = ${term})`;
+async function getCourseAlumni(user: bigint, term: number): Promise<PeerInfo["alumni"]> {
+  const alumniList: { studentId: bigint; courseCode: string; term: number }[] = await client.$queryRaw`
+    SELECT e.studentId, e.courseCode, e.term FROM Enrollment e
+    WHERE e.studentId != ${user} AND e.term < ${term} AND
+      EXISTS (SELECT 1 FROM Enrollment f
+        WHERE f.studentId = ${user} AND e.courseCode = f.courseCode AND f.term = ${term})`;
 
   return rollUpAsObjectOfArrays(alumniList.map((alum) => [alum.courseCode, { id: alum.studentId, term: alum.term }]));
 }
@@ -519,6 +560,50 @@ function meetingToLine(mtg: Meeting<true>) {
   return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${
     mtg.location === null ? "" : ` in ${mtg.location}`
   }\n`;
+}
+
+async function peerEmbeds(peers: PeerInfo, term: keyof typeof termCodes): Promise<EmbedBuilder[]> {
+  const mention = (id: bigint) => `<@${id}>`;
+  const isOrAre = (amount: number) => (amount === 1 ? "is" : "are");
+
+  const currentPeerEmbed = new EmbedBuilder({
+    title: `${term} Academic Peers`,
+    description: Object.keys(peers.coursemates).length === 0 ? "No current peers found." : undefined,
+    fields: Object.entries(peers.coursemates).map(([courseStr, ids]) => {
+      const classmateBySection = rollUpAsObjectOfArrays(
+        (peers.classmates[courseStr] ?? []).map((mate) => [mate.section, mate.id])
+      );
+      const classmateInfo = Object.entries(classmateBySection)
+        .map(
+          ([section, mates]) =>
+            `${mates.map(mention).join(", ")} ${isOrAre(mates.length)} also in section ${zeroPad(Number(section))}!`
+        )
+        .join("\n");
+      const classmateAddition = classmateInfo.length === 0 ? "" : "\n\n" + classmateInfo;
+
+      return {
+        name: courseStr,
+        value: ids.map((id) => `<@${id}>`).join(", ") + classmateAddition,
+        inline: true,
+      };
+    }),
+  });
+  const alumniEmbed = new EmbedBuilder({
+    title: `${term} Alumni Peers`,
+    description: Object.keys(peers.alumni).length === 0 ? "No alumni peers found." : undefined,
+    fields: Object.entries(peers.alumni).map(([courseStr, alums]) => {
+      return {
+        name: courseStr,
+        value: alums
+          .map(
+            ({ id, term }) =>
+              `${mention(id)} took ${courseStr} in ${reverseLookup(termCodes, term) ?? "an unknown term"}`
+          )
+          .join("\n"),
+      };
+    }),
+  });
+  return [currentPeerEmbed, alumniEmbed];
 }
 
 async function scheduleEmbed(classes: [Section<true>, Course][], term: keyof typeof termCodes): Promise<EmbedBuilder> {

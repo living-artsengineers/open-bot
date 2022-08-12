@@ -44,3 +44,7 @@ export function truncateText(text: string, maxLength: number): string {
 
   return partCut + "…";
 }
+
+export function reverseLookup<V>(record: Record<string, V>, value: V): string | null {
+  return Object.keys(record).find((key) => record[key] === value) ?? null;
+}
