@@ -51,4 +51,6 @@ model Enrollment {
   term       Int
 
   studentId BigInt
+
+  @@index([studentId, courseCode, term])
 }

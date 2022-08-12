@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { stripMarkdown, stripMarkdownTag, zeroPad } from "./utils";
+import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad } from "./utils";
 
 test("stripMarkdown", () => {
   const cases = {
@@ -40,4 +40,18 @@ test("zeroPad", () => {
   expect(zeroPad(88)).toEqual("088");
   expect(zeroPad(200)).toEqual("200");
   expect(zeroPad(999)).toEqual("999");
+});
+
+const law406 = `In this course, we consider the salient aspects of a variety of real estate transactions. Students (i) learn to identify the issues involved in each one, (ii) become familiar with the documents often utilized, (iii) determine the perspective the respective parties bring, and (iv) consider how various issues might be resolved. This course satisfies the "practicum" requirement.`;
+test("truncateText", () => {
+  // Right against the limit
+  expect(truncateText(law406, 8)).toEqual("In this…");
+  // Do not include any words that would make us break the limit
+  expect(truncateText(law406, 10)).toEqual("In this…");
+  // Do not include trailing commas
+  expect(truncateText(law406, 16)).toEqual("In this course…");
+  expect(truncateText(law406, 1)).toEqual("…");
+  expect(truncateText("aaaaaaaaaaaaaaaaaaaaaaaaa", 4)).toEqual("…");
+  expect(truncateText(law406, 9000)).toEqual(law406);
+  expect(truncateText("hello", 5)).toEqual("hello");
 });

@@ -15,7 +15,7 @@ import {
 import { Course, Meeting, Section, SectionType } from "../soc/entities";
 import { termCodes } from "../soc/umichApi";
 import client, { ensureUserExists } from "../storage";
-import { fetchGuildNickname, stripMarkdown, stripMarkdownTag, zeroPad } from "../utils";
+import { fetchGuildNickname, stripMarkdown, stripMarkdownTag, truncateText, zeroPad } from "../utils";
 import { Module, SlashCommand } from "./module";
 import { sharedClient } from "../soc/umichApi";
 import { formatTime, parseCleanIntendedTerm } from "./classLookup";
@@ -85,18 +85,25 @@ const scheduleRecord: Module = {
                 components: [
                   new SelectMenuBuilder({
                     customId: `schedule-remove-section-submit:${term}`,
-                    options: enrollments.map((enr) => {
-                      // Showing days only because some meeting descriptions are too long for Discord
-                      const days = enr[0].meetings
-                        .map((mtg) => mtg.days)
-                        .reduce((a, b) => new Set([...a, ...b]), new Set());
-                      return {
-                        label: `${enr[1].toString()} Section ${zeroPad(enr[0].number)} (${enr[0].type})`,
-                        description: days.size === 0 ? undefined : Array.from(days).join(", "),
-                        // format: [course, section number] to ease database operation
-                        value: JSON.stringify([enr[1].toString(), enr[0].number]),
-                      };
-                    }),
+                    options: await Promise.all(
+                      enrollments.map(async (enr) => {
+                        const days = Array.from(
+                          enr[0].meetings.map((mtg) => mtg.days).reduce((a, b) => new Set([...a, ...b]), new Set())
+                        ).join(", ");
+
+                        let descriptionCut = "";
+                        const fullDescription = await sharedClient.getCourseDescription(enr[1], termCodes[term]);
+                        if (fullDescription !== null) {
+                          descriptionCut = truncateText(splitDescription(fullDescription).title, 95 - days.length);
+                        }
+                        return {
+                          label: `${enr[1].toString()} Section ${zeroPad(enr[0].number)} (${enr[0].type})`,
+                          description: days.length === 0 ? descriptionCut : `${descriptionCut} (${days})`,
+                          // format: [course, section number] to ease database operation
+                          value: JSON.stringify([enr[1].toString(), enr[0].number]),
+                        };
+                      })
+                    ),
                   }),
                 ],
               }),
@@ -466,6 +473,46 @@ async function removeEnrollment(user: bigint, term: number, course: Course, sect
   });
 }
 
+async function getCoursemates(user: bigint, term: number): Promise<{ [course: string]: bigint[] }> {
+  const allCoursemates: { courseCode: string; studentId: bigint }[] =
+    await client.$queryRaw`SELECT p.courseCode, p.studentId FROM Enrollment p WHERE p.studentId <> ${user} AND p.term = ${term} AND
+      EXISTS (SELECT 1 FROM Enrollment s WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term)`;
+
+  return rollUpAsObjectOfArrays(allCoursemates.map((mate) => [mate.courseCode, mate.studentId]));
+}
+
+async function getSectionPeers(
+  user: bigint,
+  term: number
+): Promise<{ [course: string]: { id: bigint; section: number }[] }> {
+  const allSectionPeers: { courseCode: string; section: number; studentId: bigint }[] =
+    await client.$queryRaw`SELECT p.courseCode, p.section, p.studentId FROM Enrollment p WHERE p.studentId <> ${user} AND p.term = ${term} AND
+      EXISTS (SELECT 1 FROM Enrollment s WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term AND p.section = s.section)`;
+
+  return rollUpAsObjectOfArrays(
+    allSectionPeers.map((mate) => [mate.courseCode, { id: mate.studentId, section: mate.section }])
+  );
+}
+
+async function getCourseAlumni(
+  user: bigint,
+  term: number
+): Promise<{ [course: string]: { id: bigint; term: number }[] }> {
+  const alumniList: { studentId: bigint; courseCode: string; term: number }[] =
+    await client.$queryRaw`SELECT e.studentId, e.courseCode, e.term FROM Enrollment e WHERE e.studentId <> ${user} AND e.term < ${term} AND
+      EXISTS (SELECT 1 FROM Enrollment f WHERE f.studentId = ${user} AND e.courseCode = f.courseCode AND f.term = ${term})`;
+
+  return rollUpAsObjectOfArrays(alumniList.map((alum) => [alum.courseCode, { id: alum.studentId, term: alum.term }]));
+}
+
+function rollUpAsObjectOfArrays<K extends string | number | symbol, V>(items: [K, V][]): Record<K, V[]> {
+  const out = {} as Record<K, V[]>;
+  for (const [key, value] of items) {
+    out[key] ??= [];
+    out[key].push(value);
+  }
+  return out;
+}
 export default scheduleRecord;
 
 function meetingToLine(mtg: Meeting<true>) {

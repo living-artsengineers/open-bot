@@ -241,7 +241,7 @@ function parseClassInstructor(instr: ClassInstructor): Section["instructors"][nu
 function parseInstructor(instr: Instructor): Section["instructors"][number] | null {
   if (instr.FirstName !== undefined && instr.LastName !== undefined) {
     return {
-      uniqname: instr.Uniqname,
+      uniqname: instr.Uniqname.toLowerCase(),
       firstName: instr.FirstName,
       lastName: instr.LastName,
     };

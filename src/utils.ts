@@ -27,3 +27,20 @@ export function zeroPad(num: number): string {
   while (out.length < 3) out = "0" + out;
   return out;
 }
+
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 1) return "…";
+
+  const cuttingWord = /\S/.test(text[maxLength - 1]) && /\S/.test(text[maxLength - 2]);
+  let partCut = text.substring(0, maxLength - 1);
+
+  if (cuttingWord) {
+    // Remove the word that was cut in two
+    partCut = partCut.replace(/\S+$/, "");
+  }
+  // Remove trailing punctuation and whitespace
+  partCut = partCut.replaceAll(/[\s.,/#!$%^&*;:{}=\-_`~()]+$/g, "");
+
+  return partCut + "…";
+}

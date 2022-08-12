@@ -36,10 +36,12 @@ async function main() {
       } catch (e) {
         console.error(e);
         if (intx.isRepliable()) {
-          intx.reply({
-            ephemeral: true,
-            content: stripMarkdownTag`Something went wrong on my end. Sorry!\n\`\`\`${e}\`\`\``,
-          });
+          const message = stripMarkdownTag`Something went wrong on my end. Sorry!\n\`\`\`${e}\`\`\``;
+          if (intx.replied) {
+            await intx.editReply({ content: message });
+          } else {
+            await intx.followUp({ ephemeral: true, content: message });
+          }
         }
       }
     }
