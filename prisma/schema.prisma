@@ -21,6 +21,8 @@ model Message {
 model User {
   id          BigInt       @id
   username    String
+  // DM this user when someone sets their schedule with mutual courses?
+  notifyPeers Boolean      @default(true)
   messages    Message[]
   quotes      Quote[]
   enrollments Enrollment[]
