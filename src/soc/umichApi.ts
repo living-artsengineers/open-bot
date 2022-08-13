@@ -40,6 +40,7 @@ export class UMichSocApiClient implements ISocApiClient {
     sectionNumber: number,
     termCode: number
   ): Promise<Section<true> | null> {
+    // FIXME: Enrollment is ephemeral and should expire
     const cached = this.sectionCache[termCode]?.[course.toString()]?.[sectionNumber];
     if (cached !== undefined) {
       return cached;

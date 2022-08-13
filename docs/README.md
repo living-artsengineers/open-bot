@@ -37,3 +37,7 @@ Each conversation has its own C#ID (example: `C#20`), and each statement has its
 * `/random-quote` shows a random conversation from the record.
 * `/read-conversation <id>` shows the conversation with the given C#ID.
   * `id`: **Required** conversation ID as an integer (the number after "C#").
+
+### Schedule Record
+
+This module has [its own documentation file](schedule-record.md).

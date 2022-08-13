@@ -27,6 +27,8 @@ import { defaultTerm, splitDescription } from "../soc/umich";
 import { strict as assert } from "assert";
 import { Enrollment } from "@prisma/client";
 
+type Term = keyof typeof termCodes;
+
 const ephemeralMessageLifetime = 1000 * 60 * 14;
 const ignoredClasses: [Course, number][] = [
   [new Course("UARTS", 150), 1],
@@ -48,7 +50,7 @@ const scheduleRecord: Module = {
       if (intx.isButton()) {
         const tokens = intx.customId.split(":");
         if (tokens[0] === "schedule-add-section-button") {
-          const term = tokens[1] as keyof typeof termCodes;
+          const term = tokens[1] as Term;
           assert(Object.keys(termCodes).includes(term));
           const modal = new ModalBuilder()
             .setCustomId(`schedule-add-section-submit:${term}`)
@@ -81,7 +83,7 @@ const scheduleRecord: Module = {
 
           await intx.showModal(modal);
         } else if (tokens[0] === "schedule-remove-section-button") {
-          const term = tokens[1] as keyof typeof termCodes;
+          const term = tokens[1] as Term;
           assert(Object.keys(termCodes).includes(term));
 
           const enrollments = await getEnrollments(BigInt(intx.user.id), termCodes[term]);
@@ -119,11 +121,10 @@ const scheduleRecord: Module = {
             ],
           });
         } else if (tokens[0] === "schedule-peers-button") {
-          const term = tokens[1] as keyof typeof termCodes;
+          const term = tokens[1] as Term;
           if (!Object.keys(termCodes).includes(term)) return;
           const termCode = termCodes[term];
-          // FIXME Not optimal: Only check for presence. Don't fetch all of them.
-          if ((await getEnrollments(BigInt(intx.user.id), termCode)).length === 0) {
+          if (!(await hasEnrollments(BigInt(intx.user.id), termCode))) {
             await intx.reply({
               ephemeral: true,
               content: `:x: Your ${term} schedule is empty. Use \`/schedule\` or \`/schedule-set-classes\` to add classes to it.`,
@@ -141,7 +142,7 @@ const scheduleRecord: Module = {
       } else if (intx.isModalSubmit()) {
         const tokens = intx.customId.split(":");
         if (tokens[0] === "schedule-add-section-submit") {
-          const term = tokens[1] as keyof typeof termCodes;
+          const term = tokens[1] as Term;
           assert(Object.keys(termCodes).includes(term));
           const course = Course.parse(intx.fields.getTextInputValue("courseCode"));
           const section = Number(intx.fields.getTextInputValue("section"));
@@ -191,7 +192,7 @@ const scheduleRecord: Module = {
       } else if (intx.isSelectMenu()) {
         const tokens = intx.customId.split(":");
         if (tokens[0] === "schedule-remove-section-submit") {
-          const term = tokens[1] as keyof typeof termCodes;
+          const term = tokens[1] as Term;
           if (!Object.keys(termCodes).includes(term)) return;
           const [courseRaw, sectionNumberRaw] = JSON.parse(intx.values[0]);
           const course = Course.parse(courseRaw);
@@ -425,13 +426,13 @@ const scheduleRecord: Module = {
         if (!Object.keys(termCodes).includes(term)) {
           return `:x: ${term} is not a valid term.`;
         }
-        if ((await getEnrollments(BigInt(ix.user.id), termCodes[term as keyof typeof termCodes])).length === 0) {
+        if (!(await hasEnrollments(BigInt(ix.user.id), termCodes[term as Term]))) {
           return `:x: Your ${term} schedule is empty. Use \`/schedule\` or \`/schedule-set-classes\` to add classes to it.`;
         }
       }
 
       async run(ix: ChatInputCommandInteraction) {
-        const term = (ix.options.getString("term", false) ?? defaultTerm) as keyof typeof termCodes;
+        const term = (ix.options.getString("term", false) ?? defaultTerm) as Term;
         await ix.reply({
           ephemeral: true,
           embeds: await peerEmbeds(await fetchPeerInfo(BigInt(ix.user.id), termCodes[term]), term),
@@ -521,7 +522,7 @@ async function fetchPeerInfo(studentId: bigint, termCode: number) {
   return peerInfo;
 }
 
-async function updateDisplayedSchedules(userId: string, term: keyof typeof termCodes) {
+async function updateDisplayedSchedules(userId: string, term: Term) {
   await Promise.all(
     activeScheduleDisplays
       .filter((disp) => disp.userId === userId && disp.term === termCodes[term])
@@ -535,7 +536,7 @@ async function updateDisplayedSchedules(userId: string, term: keyof typeof termC
   );
 }
 
-function scheduleActionRow(classes: unknown[], term: keyof typeof termCodes) {
+function scheduleActionRow(classes: unknown[], term: Term) {
   return new ActionRowBuilder<ButtonBuilder>({
     components: [
       {
@@ -564,6 +565,17 @@ function scheduleActionRow(classes: unknown[], term: keyof typeof termCodes) {
       },
     ],
   });
+}
+
+async function hasEnrollments(user: bigint, term: number): Promise<boolean> {
+  const entry = await client.enrollment.findFirst({
+    where: {
+      studentId: user,
+      term,
+    },
+    select: { id: true },
+  });
+  return entry !== null;
 }
 
 async function getEnrollments(user: bigint, term: number): Promise<[Section<true>, Course][]> {
@@ -714,7 +726,7 @@ async function peerNotifications(enrollment: Enrollment): Promise<{ id: bigint; 
   return peers.map((peer) => ({ id: peer.studentId, message: peerNotification(peer) }));
 }
 
-async function peerEmbeds(peers: PeerInfo, term: keyof typeof termCodes): Promise<EmbedBuilder[]> {
+async function peerEmbeds(peers: PeerInfo, term: Term): Promise<EmbedBuilder[]> {
   const isOrAre = (amount: number) => (amount === 1 ? "is" : "are");
 
   const currentPeerEmbed = new EmbedBuilder({
@@ -761,7 +773,7 @@ async function peerEmbeds(peers: PeerInfo, term: keyof typeof termCodes): Promis
   return [currentPeerEmbed, alumniEmbed];
 }
 
-async function scheduleEmbed(classes: [Section<true>, Course][], term: keyof typeof termCodes): Promise<EmbedBuilder> {
+async function scheduleEmbed(classes: [Section<true>, Course][], term: Term): Promise<EmbedBuilder> {
   async function classToField([section, course]: [Section<true>, Course]): Promise<EmbedField> {
     const instructorList =
       section.instructors.length === 0
