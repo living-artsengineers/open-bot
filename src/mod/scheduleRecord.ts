@@ -177,16 +177,22 @@ const scheduleRecord: Module = {
             intx.user.id,
             (await fetchGuildNickname(intx.client, intx.user.id)) ?? intx.user.username
           );
+          const alreadyInCourse = await enrolledIn(BigInt(intx.user.id), termCodes[term], course);
           const enrollment = await addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
-          await intx.reply({
-            ephemeral: true,
-            content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${
-              sectionInfo.type
-            }) to your ${term} schedule.`,
-          });
-          await updateDisplayedSchedules(intx.user.id, term);
           if (enrollment !== undefined) {
-            await sendNotifications(intx.client, await peerNotifications(enrollment));
+            await intx.reply({
+              ephemeral: true,
+              content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${
+                sectionInfo.type
+              }) to your ${term} schedule.`,
+            });
+            await updateDisplayedSchedules(intx.user.id, term);
+            await sendNotifications(intx.client, await peerNotifications(enrollment, alreadyInCourse));
+          } else {
+            await intx.reply({
+              ephemeral: true,
+              content: `:eyes: ${course}, section ${zeroPad(section)} is already in your ${term} schedule.`,
+            });
           }
         }
       } else if (intx.isSelectMenu()) {
@@ -369,7 +375,7 @@ const scheduleRecord: Module = {
         const term = parseCleanIntendedTerm(ix);
         await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
         await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
-        const enrollments = await Promise.all(
+        await Promise.all(
           classNumbers.map(async (num, i) => {
             try {
               const sectionData = await sharedClient.fetchSectionByClassNumber(num, termCodes[term]);
@@ -382,26 +388,20 @@ const scheduleRecord: Module = {
                 return;
               }
               // Can be optimized into createMany
+              const alreadyInCourse = await enrolledIn(BigInt(ix.user.id), termCodes[term], sectionData[1]);
               const enrollment = await addEnrollment(
                 BigInt(ix.user.id),
                 termCodes[term],
                 sectionData[1],
                 sectionData[0].number
               );
+              if (enrollment !== undefined) {
+                await sendNotifications(ix.client, await peerNotifications(enrollment, alreadyInCourse));
+              }
               progressData[i] = sectionData;
-              return enrollment;
             } catch (e) {
               progressData[i] = e instanceof Error ? e : new Error(JSON.stringify(e));
               return null;
-            }
-          })
-        );
-        // problem: multiple sections of the same course leads to multiple notifications
-        await Promise.all(
-          enrollments.map(async (enr) => {
-            if (enr !== null && enr !== undefined) {
-              const notifications = await peerNotifications(enr);
-              await sendNotifications(ix.client, notifications);
             }
           })
         );
@@ -578,6 +578,18 @@ async function hasEnrollments(user: bigint, term: number): Promise<boolean> {
   return entry !== null;
 }
 
+async function enrolledIn(user: bigint, term: number, course: Course): Promise<boolean> {
+  const entry = await client.enrollment.findFirst({
+    where: {
+      studentId: user,
+      term,
+      courseCode: course.toString(),
+    },
+    select: { id: true },
+  });
+  return entry !== null;
+}
+
 async function getEnrollments(user: bigint, term: number): Promise<[Section<true>, Course][]> {
   const rows = await client.enrollment.findMany({
     where: {
@@ -685,7 +697,10 @@ function meetingToLine(mtg: Meeting<true>) {
   }\n`;
 }
 
-async function peerNotifications(enrollment: Enrollment): Promise<{ id: bigint; message: string }[]> {
+async function peerNotifications(
+  enrollment: Enrollment,
+  redundant = false
+): Promise<{ id: bigint; message: string; sendIfRedundant: boolean }[]> {
   if (
     ignoredClasses.some(
       ([course, section]) => course.toString() === enrollment.courseCode && section === enrollment.section
@@ -704,26 +719,38 @@ async function peerNotifications(enrollment: Enrollment): Promise<{ id: bigint; 
       },
     },
   });
-  function peerNotification(peer: typeof peers[0]): string {
+  function peerNotification(peer: typeof peers[0]): { message: string; sendIfRedundant: boolean } {
     const relation = peer.term === enrollment.term ? "classmate" : "alumnus";
     const peerMention = userMention(enrollment.studentId.toString());
     const lines = [`You have a new ${relation} in ${peer.courseCode}.`];
+    let sendIfRedundant = false;
 
     if (relation === "classmate") {
       lines.push(
-        `${peerMention} is taking ${peer.courseCode} in ${reverseLookup(termCodes, peer.term) ?? "???"} along with you.`
+        `${peerMention} is taking ${enrollment.courseCode} in ${
+          reverseLookup(termCodes, enrollment.term) ?? "???"
+        } along with you.`
       );
       if (peer.section === enrollment.section) {
         lines.push(`They are also in section ${enrollment.section}!`);
+        sendIfRedundant = true;
+        if (redundant) {
+          // Notifying again. The classmate is not "new" anymore.
+          lines.splice(0, 1);
+        }
       }
     } else {
       lines.push(
-        `${peerMention} took ${peer.courseCode} in ${reverseLookup(termCodes, peer.term) ?? "an unknown term"}.`
+        `${peerMention} took ${enrollment.courseCode} in ${
+          reverseLookup(termCodes, enrollment.term) ?? "an unknown term"
+        }.`
       );
     }
-    return lines.join("\n");
+    return { message: lines.join("\n"), sendIfRedundant };
   }
-  return peers.map((peer) => ({ id: peer.studentId, message: peerNotification(peer) }));
+  return peers
+    .map((peer) => ({ id: peer.studentId, ...peerNotification(peer) }))
+    .filter((msg) => !redundant || msg.sendIfRedundant);
 }
 
 async function peerEmbeds(peers: PeerInfo, term: Term): Promise<EmbedBuilder[]> {
