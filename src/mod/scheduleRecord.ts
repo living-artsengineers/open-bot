@@ -2,7 +2,6 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  CacheType,
   ChatInputCommandInteraction,
   Client,
   ComponentType,
@@ -375,7 +374,7 @@ const scheduleRecord: Module = {
         const term = parseCleanIntendedTerm(ix);
         await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
         await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
-        await Promise.all(
+        const addedEnrollments = await Promise.all(
           classNumbers.map(async (num, i) => {
             try {
               const sectionData = await sharedClient.fetchSectionByClassNumber(num, termCodes[term]);
@@ -388,23 +387,30 @@ const scheduleRecord: Module = {
                 return;
               }
               // Can be optimized into createMany
-              const alreadyInCourse = await enrolledIn(BigInt(ix.user.id), termCodes[term], sectionData[1]);
               const enrollment = await addEnrollment(
                 BigInt(ix.user.id),
                 termCodes[term],
                 sectionData[1],
                 sectionData[0].number
               );
-              if (enrollment !== undefined) {
-                await sendNotifications(ix.client, await peerNotifications(enrollment, alreadyInCourse));
-              }
               progressData[i] = sectionData;
+              return enrollment;
             } catch (e) {
               progressData[i] = e instanceof Error ? e : new Error(JSON.stringify(e));
               return null;
             }
           })
         );
+        const notifiedCourses = new Set<string>();
+        for (const enrollment of addedEnrollments) {
+          if (enrollment !== null && enrollment !== undefined) {
+            await sendNotifications(
+              ix.client,
+              await peerNotifications(enrollment, notifiedCourses.has(enrollment.courseCode))
+            );
+            notifiedCourses.add(enrollment.courseCode);
+          }
+        }
       }
     },
     class ScheduleShowPeersCommand extends SlashCommand {
