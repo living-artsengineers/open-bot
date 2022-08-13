@@ -4,23 +4,26 @@ import axios, { AxiosInstance } from "axios";
 import { Course, EnrollmentStatus, Meeting, Section, SectionType, Weekday } from "./entities";
 
 export interface ISocApiClient {
-  fetchSectionBySectionNumber(course: Course, sectionNumber: number, termCode: number): Promise<Section<true> | null>;
-  fetchSectionByClassNumber(classNumber: number, termCode: number): Promise<Section<true> | null>;
+  getSectionBySectionNumber(course: Course, sectionNumber: number, termCode: number): Promise<Section<true> | null>;
+  fetchSectionByClassNumber(classNumber: number, termCode: number): Promise<[Section<true>, Course] | null>;
   fetchAllSections(course: Course, termCode: number): Promise<Section<false>[]>;
-  fetchCourseDescription(course: Course, termCode: number): Promise<string | null>;
+  getCourseDescription(course: Course, termCode: number): Promise<string | null>;
 }
 
 // We unfortunately cannot retrieve past term codes via the SOC API
 export const termCodes = {
   "Fall 2022": 2410,
   "Winter 2022": 2370,
-  "Fall 2021": 2310,
+  "Fall 2021": 2360,
 };
 
 const endpointPrefix = "https://apigw.it.umich.edu/um/Curriculum/SOC";
 export class UMichSocApiClient implements ISocApiClient {
   private accessToken: { value: string; expireAt: DateTime } | null = null;
   private axios: AxiosInstance = axios.create({ baseURL: endpointPrefix });
+  // a null in the cache means that the course catalog doesn't have that value (don't ask for it again)
+  private descriptionCache: { [term: number]: { [course: string]: string | null } } = {};
+  private sectionCache: { [term: number]: { [course: string]: { [section: number]: Section<true> | null } } } = {};
 
   async fetchAllSections(course: Course, termCode: number): Promise<Section[]> {
     await this.refreshTokenIfNeeded();
@@ -30,6 +33,25 @@ export class UMichSocApiClient implements ISocApiClient {
     const sections = res.data.getSOCSectionsResponse.Section;
     if (sections === undefined) return [];
     return (<SectionJson[]>arrayify(sections)).map(parseSection);
+  }
+
+  async getSectionBySectionNumber(
+    course: Course,
+    sectionNumber: number,
+    termCode: number
+  ): Promise<Section<true> | null> {
+    // FIXME: Enrollment is ephemeral and should expire
+    const cached = this.sectionCache[termCode]?.[course.toString()]?.[sectionNumber];
+    if (cached !== undefined) {
+      return cached;
+    }
+    const section = await this.fetchSectionBySectionNumber(course, sectionNumber, termCode);
+    // This careful walking into nested objects is repetitive and deserves a utility function
+    if (this.sectionCache[termCode] === undefined) this.sectionCache[termCode] = {};
+    if (this.sectionCache[termCode][course.toString()] === undefined)
+      this.sectionCache[termCode][course.toString()] = {};
+    this.sectionCache[termCode][course.toString()][sectionNumber] = section;
+    return section;
   }
 
   async fetchSectionBySectionNumber(
@@ -52,12 +74,24 @@ export class UMichSocApiClient implements ISocApiClient {
     return null;
   }
 
-  async fetchSectionByClassNumber(classNumber: number, termCode: number): Promise<Section<true> | null> {
+  async fetchSectionByClassNumber(classNumber: number, termCode: number): Promise<[Section<true>, Course] | null> {
     await this.refreshTokenIfNeeded();
     const res = await this.axios.get(`/Terms/${termCode}/Classes/${classNumber}`);
     const section = res.data.getSOCSectionListByNbrResponse.ClassOffered;
     if (section === undefined) return null;
-    return parseSection(section as SectionJson);
+    const sectionInfo = parseSection(section as SectionJson);
+    const course = new Course(section.SubjectCode, section.CatalogNumber);
+    return [sectionInfo, course];
+  }
+
+  async getCourseDescription(course: Course, termCode: number): Promise<string | null> {
+    const cached = this.descriptionCache[termCode]?.[course.toString()];
+    if (cached !== undefined) return cached;
+    const fetched = await this.fetchCourseDescription(course, termCode);
+
+    if (this.descriptionCache[termCode] === undefined) this.descriptionCache[termCode] = {};
+    this.descriptionCache[termCode][course.toString()] = fetched;
+    return fetched;
   }
 
   async fetchCourseDescription(course: Course, termCode: number): Promise<string | null> {
@@ -116,9 +150,10 @@ export interface SectionJson {
 }
 
 export interface Instructor {
+  InstructorName: string;
   Uniqname: string;
-  FirstName: string;
-  LastName: string;
+  FirstName?: string;
+  LastName?: string;
 }
 export interface ClassInstructor {
   InstrUniqname: string;
@@ -155,15 +190,9 @@ export function parseSection<Loc extends boolean>(sectionJson: SectionJson): Sec
       }))
       .filter((it) => it.days.size > 0) as Meeting<Loc>[],
     instructors: (arrayify(sectionJson.ClassInstructors) ?? [])
-      .map((instr) => (instr === undefined ? null : parseInstructor(instr)))
-      .filter((it) => it !== null)
-      .concat(
-        (arrayify(sectionJson.Instructor) ?? []).map((instr) => ({
-          firstName: instr.FirstName,
-          lastName: instr.LastName,
-          uniqname: instr.Uniqname.toLowerCase(),
-        }))
-      ) as Section["instructors"],
+      .map((instr) => (instr === undefined ? null : parseClassInstructor(instr)))
+      .concat((arrayify(sectionJson.Instructor) ?? []).map(parseInstructor))
+      .filter((it) => it !== null) as Section["instructors"],
   };
 }
 
@@ -197,8 +226,8 @@ function parseMeetingTimes(times: string): Pick<Meeting, "startTime" | "endTime"
   };
 }
 
-function parseInstructor(instr: ClassInstructor): Section["instructors"][number] | null {
-  const tokens = /^(?<last>\w+),(?<first>\w+).*$/.exec(instr.InstrName);
+function parseClassInstructor(instr: ClassInstructor): Section["instructors"][number] | null {
+  const tokens = /^(?<last>.+),(?<first>\w+).*$/.exec(instr.InstrName);
 
   if (tokens?.groups === undefined || tokens?.groups.first === undefined || tokens?.groups.last === undefined) {
     return null;
@@ -208,6 +237,21 @@ function parseInstructor(instr: ClassInstructor): Section["instructors"][number]
     firstName: tokens.groups.first,
     lastName: tokens.groups.last,
   };
+}
+
+function parseInstructor(instr: Instructor): Section["instructors"][number] | null {
+  if (instr.FirstName !== undefined && instr.LastName !== undefined) {
+    return {
+      uniqname: instr.Uniqname.toLowerCase(),
+      firstName: instr.FirstName,
+      lastName: instr.LastName,
+    };
+  }
+
+  return parseClassInstructor({
+    InstrUniqname: instr.Uniqname,
+    InstrName: instr.InstructorName,
+  });
 }
 
 // An oddity of the SOC API is that all arrays with one non-array element get reduced to just that element
@@ -223,3 +267,5 @@ function arrayify<T>(possiblyArray: T | T[] | undefined): T[] {
 function integrify(possiblyString: number | string): number {
   return typeof possiblyString === "string" ? parseInt(possiblyString, 10) : possiblyString;
 }
+
+export const sharedClient: ISocApiClient = new UMichSocApiClient();

@@ -1,4 +1,4 @@
-import assert = require("assert");
+import { strict as assert } from "assert";
 import { Client } from "discord.js";
 import environment from "./environment";
 
@@ -20,4 +20,31 @@ export function devAssert(condition: boolean, message?: string | Error | undefin
   if (environment.name === "dev") {
     assert(condition, message);
   }
+}
+
+export function zeroPad(num: number): string {
+  let out = num.toString();
+  while (out.length < 3) out = "0" + out;
+  return out;
+}
+
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 1) return "…";
+
+  const cuttingWord = /\S/.test(text[maxLength - 1]) && /\S/.test(text[maxLength - 2]);
+  let partCut = text.substring(0, maxLength - 1);
+
+  if (cuttingWord) {
+    // Remove the word that was cut in two
+    partCut = partCut.replace(/\S+$/, "");
+  }
+  // Remove trailing punctuation and whitespace
+  partCut = partCut.replaceAll(/[\s.,/#!$%^&*;:{}=\-_`~()]+$/g, "");
+
+  return partCut + "…";
+}
+
+export function reverseLookup<V>(record: Record<string, V>, value: V): string | null {
+  return Object.keys(record).find((key) => record[key] === value) ?? null;
 }

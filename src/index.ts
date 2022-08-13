@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits } from "discord.js";
 import env from "./environment";
 import modules from "./mod/registry";
+import { stripMarkdownTag } from "./utils";
 
 async function main() {
   const client = new Client({
@@ -25,12 +26,27 @@ async function main() {
     const handler = commandHandlers.find((cmd) => cmd._test(intx));
 
     if (handler !== undefined) {
+      if (intx.isCommand()) {
+        console.debug(`${intx.user.username} ran ${intx.commandName} with ${JSON.stringify(intx.options.data)}`);
+      }
       const checkResult = await handler.check(intx);
       if (typeof checkResult === "string" && intx.isRepliable()) {
         intx.reply({ ephemeral: true, content: checkResult });
         return;
       }
-      await handler.run(intx);
+      try {
+        await handler.run(intx);
+      } catch (e) {
+        console.error(e);
+        if (intx.isRepliable()) {
+          const message = stripMarkdownTag`Something went wrong on my end. Sorry!\n\`\`\`${e}\`\`\``;
+          if (intx.replied) {
+            await intx.editReply({ content: message });
+          } else {
+            await intx.followUp({ ephemeral: true, content: message });
+          }
+        }
+      }
     }
   });
 
