@@ -26,6 +26,9 @@ async function main() {
     const handler = commandHandlers.find((cmd) => cmd._test(intx));
 
     if (handler !== undefined) {
+      if (intx.isCommand()) {
+        console.debug(`${intx.user.username} ran ${intx.commandName} with ${JSON.stringify(intx.options.data)}`);
+      }
       const checkResult = await handler.check(intx);
       if (typeof checkResult === "string" && intx.isRepliable()) {
         intx.reply({ ephemeral: true, content: checkResult });

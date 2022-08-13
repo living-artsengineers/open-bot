@@ -2,7 +2,9 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  CacheType,
   ChatInputCommandInteraction,
+  Client,
   ComponentType,
   EmbedBuilder,
   EmbedField,
@@ -11,6 +13,7 @@ import {
   SlashCommandBuilder,
   TextInputBuilder,
   TextInputStyle,
+  userMention,
 } from "discord.js";
 import { Course, Meeting, Section, SectionType } from "../soc/entities";
 import { termCodes } from "../soc/umichApi";
@@ -22,8 +25,14 @@ import { formatTime, parseCleanIntendedTerm } from "./classLookup";
 import { setTimeout as wait } from "timers/promises";
 import { defaultTerm, splitDescription } from "../soc/umich";
 import { strict as assert } from "assert";
+import { Enrollment } from "@prisma/client";
 
-const ephemeralMessageLifetime = 1000 * 60 * 15;
+const ephemeralMessageLifetime = 1000 * 60 * 14;
+const ignoredClasses: [Course, number][] = [
+  [new Course("UARTS", 150), 1],
+  [new Course("ENGR", 100), 210],
+];
+
 let activeScheduleDisplays: {
   userId: string;
   term: number;
@@ -122,16 +131,8 @@ const scheduleRecord: Module = {
             return;
           }
           const studentId = BigInt(intx.user.id);
-          const [coursemates, classmates, alumni] = await Promise.all([
-            getCoursemates(studentId, termCode),
-            getSectionPeers(studentId, termCode),
-            getCourseAlumni(studentId, termCode),
-          ]);
-          const peerInfo: PeerInfo = {
-            coursemates,
-            classmates,
-            alumni,
-          };
+          const peerInfo = await fetchPeerInfo(studentId, termCode);
+
           await intx.reply({
             ephemeral: true,
             embeds: await peerEmbeds(peerInfo, term),
@@ -175,7 +176,7 @@ const scheduleRecord: Module = {
             intx.user.id,
             (await fetchGuildNickname(intx.client, intx.user.id)) ?? intx.user.username
           );
-          await addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
+          const enrollment = await addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
           await intx.reply({
             ephemeral: true,
             content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${
@@ -183,6 +184,9 @@ const scheduleRecord: Module = {
             }) to your ${term} schedule.`,
           });
           await updateDisplayedSchedules(intx.user.id, term);
+          if (enrollment !== undefined) {
+            await sendNotifications(intx.client, await peerNotifications(enrollment));
+          }
         }
       } else if (intx.isSelectMenu()) {
         const tokens = intx.customId.split(":");
@@ -244,9 +248,15 @@ const scheduleRecord: Module = {
         // Wait for this interaction to time out.
         // Other interactions can edit this interaction's reply to reflect changes in the meantime.
         await wait(ephemeralMessageLifetime);
-        await ix.editReply({
-          content: `This interaction has expired. Run \`/schedule\` again to view and edit your ${term} schedule.`,
-        });
+        try {
+          await ix.editReply({
+            content: `This interaction has expired. Run \`/schedule\` again to view and edit your ${term} schedule.`,
+            embeds: [],
+          });
+        } catch (e) {
+          // Yes, swallow exceptions for failing to edit old replies
+          console.error(e);
+        }
 
         activeScheduleDisplays = activeScheduleDisplays.filter((x) => x.interaction !== ix);
       }
@@ -331,19 +341,18 @@ const scheduleRecord: Module = {
               })
               .join("\n");
 
-            await ix.editReply({
-              content: `${done ? "Finished setting your schedule." : "Resolving classes..."}\n${body}`.substring(
-                0,
-                1024
-              ),
-              embeds: done
-                ? [await scheduleEmbed(progressData.filter(Array.isArray) as [Section<true>, Course][], term)]
-                : [],
-            });
-
             if (done) {
+              const sectionsCourses = progressData.filter(Array.isArray) as [Section<true>, Course][];
+              await ix.editReply({
+                content: `Finished setting your schedule.\n${body}`.substring(0, 1024),
+                embeds: [await scheduleEmbed(sectionsCourses, term)],
+                components: [scheduleActionRow(sectionsCourses, term)],
+              });
               await updateDisplayedSchedules(ix.user.id, term);
             } else {
+              await ix.editReply({
+                content: `Resolving classes...\n${body}`.substring(0, 1024),
+              });
               setTimeout(replyUpdates, 250);
             }
           } catch (e) {
@@ -354,13 +363,12 @@ const scheduleRecord: Module = {
             });
           }
         };
-        // No awaiting on purpose
-        replyUpdates();
+        await replyUpdates();
 
         const term = parseCleanIntendedTerm(ix);
         await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
         await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
-        await Promise.all(
+        const enrollments = await Promise.all(
           classNumbers.map(async (num, i) => {
             try {
               const sectionData = await sharedClient.fetchSectionByClassNumber(num, termCodes[term]);
@@ -373,13 +381,61 @@ const scheduleRecord: Module = {
                 return;
               }
               // Can be optimized into createMany
-              await addEnrollment(BigInt(ix.user.id), termCodes[term], sectionData[1], sectionData[0].number);
+              const enrollment = await addEnrollment(
+                BigInt(ix.user.id),
+                termCodes[term],
+                sectionData[1],
+                sectionData[0].number
+              );
               progressData[i] = sectionData;
+              return enrollment;
             } catch (e) {
               progressData[i] = e instanceof Error ? e : new Error(JSON.stringify(e));
+              return null;
             }
           })
         );
+        // problem: multiple sections of the same course leads to multiple notifications
+        await Promise.all(
+          enrollments.map(async (enr) => {
+            if (enr !== null && enr !== undefined) {
+              const notifications = await peerNotifications(enr);
+              await sendNotifications(ix.client, notifications);
+            }
+          })
+        );
+      }
+    },
+    class ScheduleShowPeersCommand extends SlashCommand {
+      name = "schedule-peers";
+      description = "Find others who are taking or have taken the classes you're taking.";
+
+      build(builder: SlashCommandBuilder) {
+        builder.addStringOption((opt) =>
+          opt
+            .setName("term")
+            .setDescription(`The term for which you want to find academic peers. Current default: ${defaultTerm}`)
+            .setChoices(...Object.keys(termCodes).map((name) => ({ name, value: name })))
+            .setRequired(false)
+        );
+      }
+
+      async check(ix: ChatInputCommandInteraction) {
+        const term = ix.options.getString("term", false) ?? defaultTerm;
+        if (!Object.keys(termCodes).includes(term)) {
+          return `:x: ${term} is not a valid term.`;
+        }
+        if ((await getEnrollments(BigInt(ix.user.id), termCodes[term as keyof typeof termCodes])).length === 0) {
+          return `:x: Your ${term} schedule is empty. Use \`/schedule\` or \`/schedule-set-classes\` to add classes to it.`;
+        }
+      }
+
+      async run(ix: ChatInputCommandInteraction) {
+        const term = (ix.options.getString("term", false) ?? defaultTerm) as keyof typeof termCodes;
+        await ix.reply({
+          ephemeral: true,
+          embeds: await peerEmbeds(await fetchPeerInfo(BigInt(ix.user.id), termCodes[term]), term),
+        });
       }
     },
     class ScheduleClearCommand extends SlashCommand {
@@ -407,8 +463,63 @@ const scheduleRecord: Module = {
         await updateDisplayedSchedules(ix.user.id, term);
       }
     },
+    class SetPeerNotificationCommand extends SlashCommand {
+      name = "schedule-notify";
+      description = "Indicate whether you want to be notified about new academic peers.";
+
+      build(builder: SlashCommandBuilder) {
+        builder.addBooleanOption((opt) =>
+          opt
+            .setName("notify")
+            .setDescription("Whether you want to be notified about new academic peers")
+            .setRequired(true)
+        );
+      }
+
+      async run(ix: ChatInputCommandInteraction): Promise<void> {
+        await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
+        const user = await client.user.update({
+          where: { id: BigInt(ix.user.id) },
+          data: { notifyPeers: ix.options.getBoolean("notify", true) },
+        });
+        await ix.reply({
+          ephemeral: true,
+          content: `Got it. You will ${user.notifyPeers ? "" : "not "}be notified about new academic peers.`,
+        });
+      }
+    },
   ],
 };
+
+async function sendNotifications(client: Client, notifications: { id: bigint; message: string }[]) {
+  await Promise.all(
+    notifications.map(async ({ id, message }) => {
+      try {
+        const user = await client.users.fetch(id.toString());
+        await user.send(message);
+        console.info(`Messaged ${user.username}: ${message}`);
+      } catch (e) {
+        // Swallowing on a message-by-message basis so that one failed message doesn't abort everything here
+        console.error(`Failed to notify ${id}: ${message}`);
+        console.error(e);
+      }
+    })
+  );
+}
+
+async function fetchPeerInfo(studentId: bigint, termCode: number) {
+  const [coursemates, classmates, alumni] = await Promise.all([
+    fetchCoursemates(studentId, termCode),
+    fetchSectionPeers(studentId, termCode),
+    fetchCourseAlumni(studentId, termCode),
+  ]);
+  const peerInfo: PeerInfo = {
+    coursemates,
+    classmates,
+    alumni,
+  };
+  return peerInfo;
+}
 
 async function updateDisplayedSchedules(userId: string, term: keyof typeof termCodes) {
   await Promise.all(
@@ -494,7 +605,7 @@ async function addEnrollment(user: bigint, term: number, course: Course, section
 
   const existing = await client.enrollment.findFirst({ where: rowData });
   if (existing !== null) return;
-  await client.enrollment.create({ data: rowData });
+  return await client.enrollment.create({ data: rowData });
 }
 
 async function removeEnrollment(user: bigint, term: number, course: Course, section: number) {
@@ -514,7 +625,7 @@ interface PeerInfo {
   alumni: { [course: string]: { id: bigint; term: number }[] };
 }
 
-async function getCoursemates(user: bigint, term: number): Promise<PeerInfo["coursemates"]> {
+async function fetchCoursemates(user: bigint, term: number): Promise<PeerInfo["coursemates"]> {
   const allCoursemates: { courseCode: string; studentId: bigint }[] = await client.$queryRaw`
     SELECT p.courseCode, p.studentId FROM Enrollment p
       WHERE p.studentId != ${user} AND p.term = ${term} AND
@@ -524,7 +635,7 @@ async function getCoursemates(user: bigint, term: number): Promise<PeerInfo["cou
   return rollUpAsObjectOfArrays(allCoursemates.map((mate) => [mate.courseCode, mate.studentId]));
 }
 
-async function getSectionPeers(user: bigint, term: number): Promise<PeerInfo["classmates"]> {
+async function fetchSectionPeers(user: bigint, term: number): Promise<PeerInfo["classmates"]> {
   const allSectionPeers: { courseCode: string; section: number; studentId: bigint }[] = await client.$queryRaw`
     SELECT p.courseCode, p.section, p.studentId FROM Enrollment p
       WHERE p.studentId != ${user} AND p.term = ${term} AND
@@ -536,7 +647,7 @@ async function getSectionPeers(user: bigint, term: number): Promise<PeerInfo["cl
   );
 }
 
-async function getCourseAlumni(user: bigint, term: number): Promise<PeerInfo["alumni"]> {
+async function fetchCourseAlumni(user: bigint, term: number): Promise<PeerInfo["alumni"]> {
   const alumniList: { studentId: bigint; courseCode: string; term: number }[] = await client.$queryRaw`
     SELECT e.studentId, e.courseCode, e.term FROM Enrollment e
     WHERE e.studentId != ${user} AND e.term < ${term} AND
@@ -562,8 +673,48 @@ function meetingToLine(mtg: Meeting<true>) {
   }\n`;
 }
 
+async function peerNotifications(enrollment: Enrollment): Promise<{ id: bigint; message: string }[]> {
+  if (
+    ignoredClasses.some(
+      ([course, section]) => course.toString() === enrollment.courseCode && section === enrollment.section
+    )
+  ) {
+    return [];
+  }
+
+  const peers = await client.enrollment.findMany({
+    where: {
+      studentId: { not: enrollment.studentId },
+      courseCode: enrollment.courseCode,
+      term: { gte: enrollment.term },
+      student: {
+        notifyPeers: true,
+      },
+    },
+  });
+  function peerNotification(peer: typeof peers[0]): string {
+    const relation = peer.term === enrollment.term ? "classmate" : "alumnus";
+    const peerMention = userMention(enrollment.studentId.toString());
+    const lines = [`You have a new ${relation} in ${peer.courseCode}.`];
+
+    if (relation === "classmate") {
+      lines.push(
+        `${peerMention} is taking ${peer.courseCode} in ${reverseLookup(termCodes, peer.term) ?? "???"} along with you.`
+      );
+      if (peer.section === enrollment.section) {
+        lines.push(`They are also in section ${enrollment.section}!`);
+      }
+    } else {
+      lines.push(
+        `${peerMention} took ${peer.courseCode} in ${reverseLookup(termCodes, peer.term) ?? "an unknown term"}.`
+      );
+    }
+    return lines.join("\n");
+  }
+  return peers.map((peer) => ({ id: peer.studentId, message: peerNotification(peer) }));
+}
+
 async function peerEmbeds(peers: PeerInfo, term: keyof typeof termCodes): Promise<EmbedBuilder[]> {
-  const mention = (id: bigint) => `<@${id}>`;
   const isOrAre = (amount: number) => (amount === 1 ? "is" : "are");
 
   const currentPeerEmbed = new EmbedBuilder({
@@ -576,7 +727,9 @@ async function peerEmbeds(peers: PeerInfo, term: keyof typeof termCodes): Promis
       const classmateInfo = Object.entries(classmateBySection)
         .map(
           ([section, mates]) =>
-            `${mates.map(mention).join(", ")} ${isOrAre(mates.length)} also in section ${zeroPad(Number(section))}!`
+            `${mates.map((int) => userMention(int.toString())).join(", ")} ${isOrAre(
+              mates.length
+            )} also in section ${zeroPad(Number(section))}!`
         )
         .join("\n");
       const classmateAddition = classmateInfo.length === 0 ? "" : "\n\n" + classmateInfo;
@@ -597,7 +750,9 @@ async function peerEmbeds(peers: PeerInfo, term: keyof typeof termCodes): Promis
         value: alums
           .map(
             ({ id, term }) =>
-              `${mention(id)} took ${courseStr} in ${reverseLookup(termCodes, term) ?? "an unknown term"}`
+              `${userMention(id.toString())} took ${courseStr} in ${
+                reverseLookup(termCodes, term) ?? "an unknown term"
+              }`
           )
           .join("\n"),
       };
