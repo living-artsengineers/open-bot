@@ -706,7 +706,7 @@ function meetingToLine(mtg: Meeting<true>) {
 async function peerNotifications(
   enrollment: Enrollment,
   redundant = false
-): Promise<{ id: bigint; message: string; sendIfRedundant: boolean }[]> {
+): Promise<{ id: bigint; message: string }[]> {
   if (
     ignoredClasses.some(
       ([course, section]) => course.toString() === enrollment.courseCode && section === enrollment.section
@@ -725,12 +725,18 @@ async function peerNotifications(
       },
     },
   });
-  function peerNotification(peer: typeof peers[0]): { message: string; sendIfRedundant: boolean } {
+  function peerNotifications(peer: typeof peers[0]): { id: bigint; message: string }[] {
     const relation = peer.term === enrollment.term ? "classmate" : "alumnus";
     const peerMention = userMention(enrollment.studentId.toString());
-    const lines = [`You have a new ${relation} in ${peer.courseCode}.`];
-    let sendIfRedundant = false;
+    const lines: string[] = [];
 
+    if (redundant && (relation !== "classmate" || peer.section !== enrollment.section)) {
+      return [];
+    }
+
+    if (!redundant) {
+      lines.push(`You have a new ${relation} in ${peer.courseCode}.`);
+    }
     if (relation === "classmate") {
       lines.push(
         `${peerMention} is taking ${enrollment.courseCode} in ${
@@ -738,12 +744,7 @@ async function peerNotifications(
         } along with you.`
       );
       if (peer.section === enrollment.section) {
-        lines.push(`They are also in section ${enrollment.section}!`);
-        sendIfRedundant = true;
-        if (redundant) {
-          // Notifying again. The classmate is not "new" anymore.
-          lines.splice(0, 1);
-        }
+        lines.push(`They are also in section ${zeroPad(enrollment.section)}!`);
       }
     } else {
       lines.push(
@@ -752,11 +753,9 @@ async function peerNotifications(
         }.`
       );
     }
-    return { message: lines.join("\n"), sendIfRedundant };
+    return [{ id: peer.studentId, message: lines.join("\n") }];
   }
-  return peers
-    .map((peer) => ({ id: peer.studentId, ...peerNotification(peer) }))
-    .filter((msg) => !redundant || msg.sendIfRedundant);
+  return peers.flatMap(peerNotifications);
 }
 
 async function peerEmbeds(peers: PeerInfo, term: Term): Promise<EmbedBuilder[]> {
