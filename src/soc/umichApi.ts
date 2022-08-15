@@ -68,7 +68,7 @@ export class UMichSocApiClient implements ISocApiClient {
       `/Terms/${termCode}/Schools/UM/Subjects/${course.subject}/CatalogNbrs/${course.number}/Sections/${sectionNumberStr}`
     );
     const section = res.data.getSOCSectionDetailResponse;
-    if ("SectionType" in section) {
+    if (section !== undefined && "SectionType" in section) {
       return { ...parseSection(section as SectionJson), number: sectionNumber };
     }
     return null;
