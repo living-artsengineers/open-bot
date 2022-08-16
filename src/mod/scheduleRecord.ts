@@ -17,7 +17,14 @@ import {
 import { Course, Meeting, Section, SectionType } from "../soc/entities";
 import { termCodes } from "../soc/umichApi";
 import client, { ensureUserExists } from "../storage";
-import { fetchGuildNickname, reverseLookup, stripMarkdown, stripMarkdownTag, truncateText, zeroPad } from "../utils";
+import {
+  fetchInteractionUserNickname,
+  reverseLookup,
+  stripMarkdown,
+  stripMarkdownTag,
+  truncateText,
+  zeroPad,
+} from "../utils";
 import { Module, SlashCommand } from "./module";
 import { sharedClient } from "../soc/umichApi";
 import { formatTime, parseCleanIntendedTerm } from "./classLookup";
@@ -167,15 +174,14 @@ const scheduleRecord: Module = {
           if (sectionInfo === null) {
             await intx.reply({
               ephemeral: true,
-              content: `:x: That section does not exist during ${term}.\n_Note: Do not put midterm sections (type "MID") into your schedule here._`,
+              content:
+                `:x: Section ${section} does not exist for ${course.toString()} during ${term}.\n` +
+                `_Note: Do not put Evening Exam sections (type "MID") into your schedule here._`,
             });
             return;
           }
 
-          await ensureUserExists(
-            intx.user.id,
-            (await fetchGuildNickname(intx.client, intx.user.id)) ?? intx.user.username
-          );
+          await ensureUserExists(intx.user.id, await fetchInteractionUserNickname(intx));
           const alreadyInCourse = await enrolledIn(BigInt(intx.user.id), termCodes[term], course);
           const enrollment = await addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
           if (enrollment !== undefined) {
@@ -235,7 +241,7 @@ const scheduleRecord: Module = {
 
       async run(ix: ChatInputCommandInteraction) {
         await ix.deferReply({ ephemeral: true });
-        await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
+        await ensureUserExists(ix.user.id, await fetchInteractionUserNickname(ix));
         const term = parseCleanIntendedTerm(ix);
         const classes = await getEnrollments(BigInt(ix.user.id), termCodes[term]);
         const actionRow = scheduleActionRow(classes, term);
@@ -372,7 +378,7 @@ const scheduleRecord: Module = {
         await replyUpdates();
 
         const term = parseCleanIntendedTerm(ix);
-        await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
+        await ensureUserExists(ix.user.id, await fetchInteractionUserNickname(ix));
         await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
         const addedEnrollments = await Promise.all(
           classNumbers.map(async (num, i) => {
@@ -484,7 +490,7 @@ const scheduleRecord: Module = {
       }
 
       async run(ix: ChatInputCommandInteraction): Promise<void> {
-        await ensureUserExists(ix.user.id, (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username);
+        await ensureUserExists(ix.user.id, await fetchInteractionUserNickname(ix));
         const user = await client.user.update({
           where: { id: BigInt(ix.user.id) },
           data: { notifyPeers: ix.options.getBoolean("notify", true) },

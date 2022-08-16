@@ -1,5 +1,5 @@
 import { strict as assert } from "assert";
-import { Client } from "discord.js";
+import { BaseInteraction, Client } from "discord.js";
 import environment from "./environment";
 
 export function stripMarkdown(s: string): string {
@@ -14,6 +14,10 @@ export async function fetchGuildNickname(client: Client, id: string): Promise<st
   const guild = await client.guilds.fetch(environment.guild);
   const member = await guild.members.fetch(id);
   return member.nickname;
+}
+
+export async function fetchInteractionUserNickname<T extends BaseInteraction>(ix: T): Promise<string> {
+  return (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username;
 }
 
 export function devAssert(condition: boolean, message?: string | Error | undefined) {
