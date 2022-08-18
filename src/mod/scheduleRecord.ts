@@ -741,12 +741,17 @@ async function peerNotifications(
       },
     },
   });
-  function peerNotifications(peer: typeof peers[0]): { id: bigint; message: string }[] {
+  type DirectMessageCandidate = { id: bigint; message: string; priority: number };
+  // Priority: 1 alumni, 2 coursemates, 3 sectionmates
+  // Redundant requires priority 3
+  function peerNotifications(peer: typeof peers[0]): DirectMessageCandidate[] {
     const relation = peer.term === enrollment.term ? "classmate" : "alumnus";
+    const sameSection = peer.section === enrollment.section;
+    const priority = peer.term === enrollment.term ? (sameSection ? 3 : 2) : 1;
     const peerMention = userMention(enrollment.studentId.toString());
     const lines: string[] = [];
 
-    if (redundant && (relation !== "classmate" || peer.section !== enrollment.section)) {
+    if (redundant && priority < 3) {
       return [];
     }
 
@@ -769,9 +774,16 @@ async function peerNotifications(
         }.`
       );
     }
-    return [{ id: peer.studentId, message: lines.join("\n") }];
+    return [{ id: peer.studentId, message: lines.join("\n"), priority }];
   }
-  return peers.flatMap(peerNotifications);
+  const deduplicator: { [id: string]: DirectMessageCandidate } = {};
+  for (const candidate of peers.flatMap(peerNotifications)) {
+    const currentTop = deduplicator[candidate.id.toString()];
+    if (currentTop === undefined || candidate.priority > currentTop.priority) {
+      deduplicator[candidate.id.toString()] = candidate;
+    }
+  }
+  return Object.values(deduplicator);
 }
 
 async function peerEmbeds(peers: PeerInfo, term: Term): Promise<EmbedBuilder[]> {
