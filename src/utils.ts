@@ -1,5 +1,6 @@
 import { strict as assert } from "assert";
-import { Client } from "discord.js";
+import { BaseInteraction, Client } from "discord.js";
+import { DateTime, Duration } from "luxon";
 import environment from "./environment";
 
 export function stripMarkdown(s: string): string {
@@ -14,6 +15,10 @@ export async function fetchGuildNickname(client: Client, id: string): Promise<st
   const guild = await client.guilds.fetch(environment.guild);
   const member = await guild.members.fetch(id);
   return member.nickname;
+}
+
+export async function fetchInteractionUserNickname<T extends BaseInteraction>(ix: T): Promise<string> {
+  return (await fetchGuildNickname(ix.client, ix.user.id)) ?? ix.user.username;
 }
 
 export function devAssert(condition: boolean, message?: string | Error | undefined) {
@@ -47,4 +52,10 @@ export function truncateText(text: string, maxLength: number): string {
 
 export function reverseLookup<V>(record: Record<string, V>, value: V): string | null {
   return Object.keys(record).find((key) => record[key] === value) ?? null;
+}
+
+export function formatTime(dur: Duration | null): string {
+  if (dur === null) return "TBA";
+  const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
+  return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);
 }
