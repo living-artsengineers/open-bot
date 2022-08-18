@@ -365,6 +365,12 @@ const scheduleRecord: Module = {
                 components: [scheduleActionRow(sectionsCourses, term)],
               });
               await updateDisplayedSchedules(ix.user.id, term);
+              activeScheduleDisplays.push({
+                userId: ix.user.id,
+                term: termCodes[term],
+                interaction: ix,
+                expire: new Date(Date.now() + ephemeralMessageLifetime),
+              });
             } else {
               await ix.editReply({
                 content: `Resolving classes...\n${body}`.substring(0, 1024),
@@ -841,21 +847,20 @@ async function scheduleEmbed(
   }
 
   const renderer = new ScheduleRenderer(classes);
-  const filename = join("assets", `${userId}-schedule.png`);
-  await renderer.render(filename);
+  const filename = `${userId}-${termCodes[term]}-schedule.png`;
+  const filePath = join("assets", filename);
+  await renderer.render(filePath);
 
-  const embed = new EmbedBuilder({
-    title: `Your ${term} Schedule`,
-    description:
-      classes.length === 0 ? 'Your schedule is empty. Click ":heavy_plus_sign: Add class" to add a class.' : undefined,
-    fields: await Promise.all(classes.map(classToField)),
-    image: {
-      url: `attachment://${filename}`,
-    },
-  });
+  const embed = new EmbedBuilder()
+    .setTitle(`Your ${term} Schedule`)
+    .setDescription(
+      classes.length === 0 ? 'Your schedule is empty. Click ":heavy_plus_sign: Add class" to add a class.' : null
+    )
+    .setFields(await Promise.all(classes.map(classToField)))
+    .setImage(`attachment://${filename}`);
 
   return {
     embeds: [embed],
-    files: [new AttachmentBuilder(filename)],
+    files: [new AttachmentBuilder(filePath)],
   };
 }

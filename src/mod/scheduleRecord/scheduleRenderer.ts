@@ -4,10 +4,11 @@ import { Course, Meeting, Section, Weekday } from "../../soc/entities";
 import { Duration } from "luxon";
 import * as fs from "fs";
 import { join } from "path";
+import { zeroPad } from "../../utils";
 
 const config = {
   // Width of the entire image shown to the user.
-  imageWidth: 600,
+  imageWidth: 1000,
   // Each hour irl corresponds to this number of pixels high.
   heightPerHour: 80,
   // Width reserved for time labels (8 AM, 12 PM, etc.)
@@ -19,10 +20,21 @@ const config = {
   // Padding in each table cell, for text
   textPadding: 4,
   // Normal font for all labels
-  fontFamily: "Source Sans 3",
-  // Scale for all primitive drawings in order to make the final image sharper
-  // canvasScale: 2,
-  fontSize: 18,
+  sectionFontFamily: "Iosevka Curly",
+  marginFontFamily: "Iosevka Curly Slab",
+  // Colors for distinguishing courses (in RGB)
+  courseColors: [
+    [91, 88, 143],
+    [66, 134, 33],
+    [106, 39, 134],
+    [115, 123, 85],
+    [42, 43, 240],
+    [169, 104, 28],
+    [215, 37, 163],
+    [36, 128, 161],
+  ],
+  marginFontSize: 18,
+  sectionFontSize: 16,
   style: {
     background: "rgb(47,49,54)",
     borders: "rgb(120,120,120)",
@@ -35,22 +47,38 @@ const config = {
   },
 };
 
-PImage.registerFont(join("fonts", "SourceSans3-Regular.ttf"), "Source Sans 3", 400, "normal", "normal").loadSync();
-PImage.registerFont("C:\\Windows\\Fonts\\comic.ttf", "Comic Sans MS", 400, "normal", "normal").loadSync();
+PImage.registerFont(
+  join("fonts", "iosevka-term-curly-regular.ttf"),
+  "Iosevka Curly",
+  400,
+  "normal",
+  "normal"
+).loadSync();
+PImage.registerFont(
+  join("fonts", "iosevka-term-curly-slab-regular.ttf"),
+  "Iosevka Curly Slab",
+  400,
+  "normal",
+  "normal"
+).loadSync();
+PImage.registerFont(join("fonts", "ComicNeue-Regular.ttf"), "Comic Neue", 400, "normal", "normal").loadSync();
 
 export class ScheduleRenderer {
   readonly canvas: Bitmap;
   readonly hoursVisible: number;
-  readonly fontFamily: string;
+  readonly sectionFontFamily: string;
+  readonly marginFontFamily: string;
 
   constructor(private readonly sections: [Section<true>, Course][]) {
-    this.hoursVisible = totalHours(this.latestTimeShown()) - totalHours(this.earliestTimeShown());
+    this.hoursVisible = Math.ceil(totalHours(this.latestTimeShown()) - totalHours(this.earliestTimeShown()));
     this.canvas = PImage.make(
       config.imageWidth,
       config.heightPerHour * this.hoursVisible + 2 * config.tablePadding + config.dayLabelHeight,
       {}
     );
-    this.fontFamily = Math.random() < 1 ? "Comic Sans MS" : config.fontFamily;
+    const funny = Math.random() < 0.1;
+    this.sectionFontFamily = funny ? "Comic Neue" : config.sectionFontFamily;
+    this.marginFontFamily = funny ? "Comic Neue" : config.marginFontFamily;
   }
 
   public async render(filename: string) {
@@ -70,7 +98,7 @@ export class ScheduleRenderer {
     const ctx = this.canvas.getContext("2d");
     ctx.textBaseline = "middle";
     ctx.lineWidth = 2;
-    ctx.font = `${config.fontSize}px ${this.fontFamily}`;
+    ctx.font = `${config.marginFontSize}px ${this.marginFontFamily}`;
 
     // Vertical
     for (let i = 0; i < config.weekdays.length; i++) {
@@ -101,15 +129,23 @@ export class ScheduleRenderer {
   }
 
   private drawSections() {
-    for (const [section] of this.sections) {
+    const uniqueCourses = Array.from(new Set(this.sections.map((x) => x[1].toString())));
+    for (const [section, course] of this.sections) {
       for (const meeting of section.meetings) {
-        this.renderMeeting(meeting);
+        this.renderMeeting(course, uniqueCourses.indexOf(course.toString()), section, meeting);
       }
     }
   }
 
-  private renderMeeting(meeting: Meeting<true>) {
+  private renderMeeting(course: Course, colorIndex: number, section: Section<true>, meeting: Meeting<true>) {
     const ctx = this.canvas.getContext("2d");
+    function rgba(rgb: number[], a: number) {
+      return `rgba(${rgb.join(",")},${a})`;
+    }
+    const bgFillStyle = rgba(
+      config.courseColors[(colorIndex + config.courseColors.length) % config.courseColors.length],
+      0.7
+    );
     if (meeting.startTime !== null && meeting.endTime !== null) {
       for (const day of meeting.days) {
         const leftX =
@@ -120,13 +156,30 @@ export class ScheduleRenderer {
           config.dayLabelHeight;
         const height = (totalHours(meeting.endTime) - totalHours(meeting.startTime)) * config.heightPerHour;
         const width = config.widthPerWeekday;
-        ctx.fillStyle = "#ff0000";
+
+        ctx.fillStyle = bgFillStyle;
         ctx.fillRect(
           leftX + config.textPadding,
           topY + config.textPadding,
           width - 2 * config.textPadding,
           height - 2 * config.textPadding
         );
+        ctx.fillStyle = config.style.text;
+        ctx.font = `${config.sectionFontSize}px ${this.sectionFontFamily}`;
+        const label = [
+          `${course.toString()} ${section.type}`,
+          `Section ${zeroPad(section.number)}`,
+          `${meeting.location ?? ""}`,
+        ];
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        label.forEach((line, i) => {
+          ctx.fillText(
+            line,
+            leftX + config.textPadding * 2,
+            topY + config.textPadding * 2 + i * config.marginFontSize * 1.1
+          );
+        });
       }
     }
   }
