@@ -1,5 +1,6 @@
+import { Duration } from "luxon";
 import { test, expect } from "vitest";
-import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad, reverseLookup } from "./utils";
+import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad, reverseLookup, formatTime } from "./utils";
 
 test("stripMarkdown", () => {
   const cases = {
@@ -62,7 +63,15 @@ test("reverseLookup", () => {
     b: 3,
     j: 10,
   };
-  expect(reverseLookup(obj, 3)).toEqual("a");
+  expect(reverseLookup(obj, 3)).toEqual("b");
   expect(reverseLookup(obj, 10)).toEqual("j");
   expect(reverseLookup(obj, 1)).toBeNull();
+});
+
+test("formatTime", () => {
+  expect(formatTime(Duration.fromObject({ hour: 8 }))).toEqual("8:00 AM");
+  expect(formatTime(Duration.fromObject({ hour: 8, minute: 30 }))).toEqual("8:30 AM");
+  expect(formatTime(Duration.fromObject({ hour: 0, minute: 12 }))).toEqual("12:12 AM");
+  expect(formatTime(Duration.fromObject({ hour: 12, minute: 12 }))).toEqual("12:12 PM");
+  expect(formatTime(Duration.fromObject({ hour: 23, minute: 59 }))).toEqual("11:59 PM");
 });

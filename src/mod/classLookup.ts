@@ -5,12 +5,11 @@ import {
   EmbedBuilder,
   SlashCommandBuilder,
 } from "discord.js";
-import { DateTime, Duration } from "luxon";
 import { locationOfFacility } from "../campus/umCampus";
 import environment from "../environment";
 import { Course, EnrollmentStatus, Section } from "../soc/entities";
 import { termCodes } from "../soc/umichApi";
-import { stripMarkdownTag } from "../utils";
+import { formatTime, stripMarkdownTag } from "../utils";
 import { AutocompletingSlashCommand, Module } from "./module";
 import { sharedClient as umClient } from "../soc/umichApi";
 import { splitDescription, defaultTerm } from "../soc/umich";
@@ -209,12 +208,6 @@ function formatLocation(facility: string): string {
   const loc = locationOfFacility(facility);
   if (loc === null) return facility;
   return stripMarkdownTag`[${facility}](https://www.google.com/maps/dir//${encodeURIComponent(loc.address)})`;
-}
-
-export function formatTime(dur: Duration | null): string {
-  if (dur === null) return "TBA";
-  const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
-  return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);
 }
 
 async function getTermCatalog(term: number): Promise<{ [code: string]: number[] }> {

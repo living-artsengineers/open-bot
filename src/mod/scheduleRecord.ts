@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ChatInputCommandInteraction,
@@ -24,14 +25,17 @@ import {
   stripMarkdownTag,
   truncateText,
   zeroPad,
+  formatTime,
 } from "../utils";
 import { Module, SlashCommand } from "./module";
 import { sharedClient } from "../soc/umichApi";
-import { formatTime, parseCleanIntendedTerm } from "./classLookup";
+import { parseCleanIntendedTerm } from "./classLookup";
 import { setTimeout as wait } from "timers/promises";
 import { defaultTerm, splitDescription } from "../soc/umich";
 import { strict as assert } from "assert";
 import { Enrollment } from "@prisma/client";
+import { ScheduleRenderer } from "./scheduleRecord/scheduleRenderer";
+import { join } from "path";
 
 type Term = keyof typeof termCodes;
 
@@ -51,7 +55,7 @@ let activeScheduleDisplays: {
 const scheduleRecord: Module = {
   name: "scheduleRecord",
   async setup(client) {
-    // schedule-setup's modal submissions
+    // schedule-setup's modal submissions and button clicks
     client.on("interactionCreate", async (intx) => {
       if (intx.isButton()) {
         const tokens = intx.customId.split(":");
@@ -247,7 +251,7 @@ const scheduleRecord: Module = {
         const actionRow = scheduleActionRow(classes, term);
 
         await ix.editReply({
-          embeds: [await scheduleEmbed(classes, term)],
+          ...(await scheduleEmbed(ix.user.id, classes, term)),
           components: [actionRow],
         });
 
@@ -357,7 +361,7 @@ const scheduleRecord: Module = {
               const sectionsCourses = progressData.filter(Array.isArray) as [Section<true>, Course][];
               await ix.editReply({
                 content: `Finished setting your schedule.\n${body}`.substring(0, 1024),
-                embeds: [await scheduleEmbed(sectionsCourses, term)],
+                ...(await scheduleEmbed(ix.user.id, sectionsCourses, term)),
                 components: [scheduleActionRow(sectionsCourses, term)],
               });
               await updateDisplayedSchedules(ix.user.id, term);
@@ -541,7 +545,7 @@ async function updateDisplayedSchedules(userId: string, term: Term) {
       .map(async (disp) => {
         const enrollments = await getEnrollments(BigInt(userId), termCodes[term]);
         disp.interaction.editReply({
-          embeds: [await scheduleEmbed(enrollments, term)],
+          ...(await scheduleEmbed(userId, enrollments, term)),
           components: [scheduleActionRow(enrollments, term)],
         });
       })
@@ -811,7 +815,11 @@ async function peerEmbeds(peers: PeerInfo, term: Term): Promise<EmbedBuilder[]> 
   return [currentPeerEmbed, alumniEmbed];
 }
 
-async function scheduleEmbed(classes: [Section<true>, Course][], term: Term): Promise<EmbedBuilder> {
+async function scheduleEmbed(
+  userId: string,
+  classes: [Section<true>, Course][],
+  term: Term
+): Promise<{ embeds: EmbedBuilder[]; files: AttachmentBuilder[] }> {
   async function classToField([section, course]: [Section<true>, Course]): Promise<EmbedField> {
     const instructorList =
       section.instructors.length === 0
@@ -832,10 +840,22 @@ async function scheduleEmbed(classes: [Section<true>, Course][], term: Term): Pr
     };
   }
 
-  return new EmbedBuilder({
+  const renderer = new ScheduleRenderer(classes);
+  const filename = join("assets", `${userId}-schedule.png`);
+  await renderer.render(filename);
+
+  const embed = new EmbedBuilder({
     title: `Your ${term} Schedule`,
     description:
       classes.length === 0 ? 'Your schedule is empty. Click ":heavy_plus_sign: Add class" to add a class.' : undefined,
     fields: await Promise.all(classes.map(classToField)),
+    image: {
+      url: `attachment://${filename}`,
+    },
   });
+
+  return {
+    embeds: [embed],
+    files: [new AttachmentBuilder(filename)],
+  };
 }
