@@ -8,7 +8,7 @@ import { zeroPad } from "../../utils";
 
 const config = {
   // Width of the entire image shown to the user.
-  imageWidth: 1000,
+  imageWidth: 900,
   // Each hour irl corresponds to this number of pixels high.
   heightPerHour: 80,
   // Width reserved for time labels (8 AM, 12 PM, etc.)
@@ -61,7 +61,7 @@ PImage.registerFont(
   "normal",
   "normal"
 ).loadSync();
-PImage.registerFont(join("fonts", "ComicNeue-Regular.ttf"), "Comic Neue", 400, "normal", "normal").loadSync();
+PImage.registerFont(join("fonts", "ComicNeue-Bold.ttf"), "Comic Neue", 600, "normal", "normal").loadSync();
 
 export class ScheduleRenderer {
   readonly canvas: Bitmap;
