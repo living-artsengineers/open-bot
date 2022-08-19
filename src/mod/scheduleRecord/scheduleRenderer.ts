@@ -70,7 +70,7 @@ export class ScheduleRenderer {
   readonly marginFontFamily: string;
 
   constructor(private readonly sections: [Section<true>, Course][]) {
-    this.hoursVisible = Math.ceil(totalHours(this.latestTimeShown()) - totalHours(this.earliestTimeShown()));
+    this.hoursVisible = totalHours(this.latestTimeShown()) - totalHours(this.earliestTimeShown());
     this.canvas = PImage.make(
       config.imageWidth,
       config.heightPerHour * this.hoursVisible + 2 * config.tablePadding + config.dayLabelHeight,
@@ -195,7 +195,8 @@ export class ScheduleRenderer {
         }
       }
     }
-    return earliest;
+    // Discard the minute value for flooring
+    return Duration.fromObject({ hour: earliest.hours });
   }
 
   private latestTimeShown(): Duration {
@@ -207,7 +208,8 @@ export class ScheduleRenderer {
         }
       }
     }
-    return latest;
+    // Ceiling function to next hour
+    return latest.minutes > 0 ? Duration.fromObject({ hour: latest.hours + 1 }) : latest;
   }
 }
 
