@@ -48,7 +48,7 @@
     "lng": -83.734518,
     "name": "Alexander G Ruthven Museums Building"
   },
-  "TAUBL": {
+  "THSL": {
     "address": "1135 Catherine Street Ann Arbor, MI 48109",
     "id": "taubl",
     "lat": 42.28358,
@@ -67,7 +67,14 @@
     "id": "ah",
     "lat": 42.276284,
     "lng": -83.739791,
-    "name": "Angell Hall and Tisch Hall"
+    "name": "Angell Hall"
+  },
+  "TISCH": {
+    "address": "435 S. State Street Ann Arbor, MI 48109-1003",
+    "id": "tisch",
+    "lat": 42.27622845128436,
+    "lng": -83.739835615625,
+    "name": "Tisch Hall"
   },
   "LBME": {
     "address": "1101 Beal Avenue Ann Arbor, MI 48109-2110",
@@ -104,9 +111,9 @@
     "lng": -83.755421,
     "name": "Argus Building II"
   },
-  "AAB": {
+  "A&AB": {
     "address": "2000 Bonisteel Boulevard Ann Arbor, MI 48109-2069",
-    "id": "aab",
+    "id": "a&ab",
     "lat": 42.289333,
     "lng": -83.717387,
     "name": "Art Architecture Building"
@@ -202,12 +209,12 @@
     "lng": -83.720948,
     "name": "Bursley Hall, Joseph A. & Marguerite K."
   },
-  "CCL": {
-    "address": "110 N. University Avenue Ann Arbor, MI 48109-1005",
-    "id": "ccl",
-    "lat": 42.277572,
-    "lng": -83.735269,
-    "name": "C. C. Little Science Building"
+  "NUB": {
+    "address": "1100 N. University Avenue Ann Arbor, MI 48109",
+    "id": "nub",
+    "lat": 42.2775033,
+    "lng": -83.7353997,
+    "name": "1100 North University Building"
   },
   "CSSB": {
     "address": "1239 Kipke Drive Ann Arbor, MI 48109-2036",
@@ -293,7 +300,7 @@
     "lng": -83.716045,
     "name": "Duderstadt Center"
   },
-  "MOORE": {
+  "SM": {
     "address": "1100 Baits Drive Ann Arbor, MI 48109-2085",
     "id": "moore",
     "lat": 42.289774,
@@ -412,7 +419,7 @@
     "lng": -83.743538,
     "name": "Golf Course Clubhouse"
   },
-  "GFLAB": {
+  "GFL": {
     "address": "2609 Draper Drive Ann Arbor, MI 48109-2101",
     "id": "gflab",
     "lat": 42.293342,
@@ -650,7 +657,7 @@
     "lng": -83.748662,
     "name": "Michigan Stadium"
   },
-  "UNIO": {
+  "UNION": {
     "address": "530 S. State Street Ann Arbor, MI 48109-1308",
     "id": "unio",
     "lat": 42.275175,
@@ -951,7 +958,7 @@
     "lng": -83.737744,
     "name": "School of Nursing Building"
   },
-  "SSW": {
+  "SSWB": {
     "address": "1080 South University Avenue Ann Arbor, MI 48109-1106",
     "id": "ssw",
     "lat": 42.2747,
@@ -986,19 +993,12 @@
     "lng": -83.742154,
     "name": "South Quad"
   },
-  "SRB": {
+  "CSRB": {
     "address": "2455 Hayward Street Ann Arbor, MI 48109-2143",
-    "id": "srb",
+    "id": "csrb",
     "lat": 42.294418,
     "lng": -83.711396,
-    "name": "Space Research Laboratory"
-  },
-  "ROSS": {
-    "address": "1110 South State Street Ann Arbor, MI 48109",
-    "id": "ross",
-    "lat": 42.268632,
-    "lng": -83.74104,
-    "name": "Stephen M Ross Academic Center"
+    "name": "Climate and Space Research Building"
   },
   "STOCK": {
     "address": "324 S. Observatory Street Ann Arbor, MI 48109-2040",
@@ -1153,5 +1153,109 @@
     "lat": 42.276624,
     "lng": -83.735146,
     "name": "Weiser Hall"
+  },
+  "AL": {
+    "address": "1231 Beal Avenue Ann Arbor, MI 48109",
+    "id": "al",
+    "lat": 42.2918763,
+    "lng": -83.7138915,
+    "name": "Walter E. Lay Automotive Laboratory"
+  },
+  "BAM HALL": {
+    "address": "1100 Baits Drive Ann Arbor, MI 48109",
+    "id": "bam hall",
+    "lat": 42.289774,
+    "lng": -83.720958,
+    "name": "Blanch Anderson Moore Hall"
+  },
+  "BLAU": {
+    "address": "700 East University Avenue Ann Arbor, MI 48109",
+    "id": "blau",
+    "lat": 42.2731,
+    "lng": -83.7363,
+    "name": "Jeff T. Blau Hall"
+  },
+  "BMT": {
+    "address": "881 University Avenue Ann Arbor, MI 48109",
+    "id": "bmt",
+    "lat": 42.2794378,
+    "lng": -83.7387105,
+    "name": "Burton Memorial Tower"
+  },
+  "BSB": {
+    "address": "1105 North University Avenue Ann Arbor, MI 48109",
+    "id": "bsb",
+    "lat": 42.27896,
+    "lng": -83.7341,
+    "name": "Biological Sciences Building"
+  },
+  "BUS": {
+    "address": "701 Tappan Avenue Ann Arbor, MI 48109",
+    "id": "bus",
+    "lat": 42.2726756,
+    "lng": -83.7375650,
+    "name": "Business Administration"
+  },
+  "DANCE": {
+    "address": "1100 Baits Drive Ann Arbor, MI 48109",
+    "id": "dance",
+    "lat": 42.2894365242966,
+    "lng": -83.7211245255371,
+    "name": "Dance Building"
+  },
+  "EWRE": {
+    "address": "1351 Beal Avenue Ann Arbor, MI 48109",
+    "id": "ewre",
+    "lat": 42.2927805,
+    "lng": -83.7133762,
+    "name": "Environmental and Water Resources Engineering"
+  },
+  "HUTCH": {
+    "address": "625 State Street Ann Arbor, MI 48109",
+    "lat": 42.2736517,
+    "lng": -83.7400960,
+    "name": "Hutchins Hall"
+  },
+  "KELSEY": {
+    "address": "434 State Street Ann Arbor, MI 48109",
+    "lat": 42.2767369,
+    "lng": -83.7413388,
+    "name": "Newberry Hall"
+  },
+  "LANE": {
+    "address": "204 State Street Ann Arbor, MI 48109",
+    "lat": 42.2799385,
+    "lng": -83.7412432,
+    "name": "Lane Hall"
+  },
+  "LEC": {
+    "address": "1221 Beal Avenue Ann Arbor, MI 48109",
+    "lat": 42.2915219,
+    "lng": -83.7138255,
+    "name": "Lurie Engineering Center"
+  },
+  "LSI": {
+    "address": "210 Washtenaw Avenue Ann Arbor, MI 48109",
+    "lat": 42.2796354,
+    "lng": -83.7341956,
+    "name": "Life Sciences Institute Building"
+  },
+  "SKB": {
+    "address": "830 University Avenue Ann Arbor, MI 48109",
+    "lat": 42.2780512,
+    "lng": -83.7389075,
+    "name": "School of Kinesiology Building"
+  },
+  "STAMPS": {
+    "address": "1226 Murfin Avenue Ann Arbor, MI 48109",
+    "lat": 42.2918928,
+    "lng": -83.7176620,
+    "name": "Stamps Auditorium"
+  },
+  "WDC": {
+    "address": "1226 Murfin Avenue Ann Arbor, MI 48109",
+    "lat": 42.2918928,
+    "lng": -83.7176620,
+    "name": "Walgreen Drama Center"
   }
 }
