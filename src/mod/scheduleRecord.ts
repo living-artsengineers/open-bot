@@ -36,6 +36,7 @@ import { strict as assert } from "assert";
 import { Enrollment } from "@prisma/client";
 import { ScheduleRenderer } from "./scheduleRecord/scheduleRenderer";
 import { join } from "path";
+import * as store from "./scheduleRecord/scheduleStorage";
 
 type Term = keyof typeof termCodes;
 
@@ -96,7 +97,7 @@ const scheduleRecord: Module = {
           const term = tokens[1] as Term;
           assert(Object.keys(termCodes).includes(term));
 
-          const enrollments = await getEnrollments(BigInt(intx.user.id), termCodes[term]);
+          const enrollments = await store.getEnrollments(BigInt(intx.user.id), termCodes[term]);
 
           await intx.reply({
             ephemeral: true,
@@ -134,7 +135,7 @@ const scheduleRecord: Module = {
           const term = tokens[1] as Term;
           if (!Object.keys(termCodes).includes(term)) return;
           const termCode = termCodes[term];
-          if (!(await hasEnrollments(BigInt(intx.user.id), termCode))) {
+          if (!(await store.hasEnrollments(BigInt(intx.user.id), termCode))) {
             await intx.reply({
               ephemeral: true,
               content: `:x: Your ${term} schedule is empty. Use \`/schedule\` or \`/schedule-set-classes\` to add classes to it.`,
@@ -186,8 +187,8 @@ const scheduleRecord: Module = {
           }
 
           await ensureUserExists(intx.user.id, await fetchInteractionUserNickname(intx));
-          const alreadyInCourse = await enrolledIn(BigInt(intx.user.id), termCodes[term], course);
-          const enrollment = await addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
+          const alreadyInCourse = await store.enrolledIn(BigInt(intx.user.id), termCodes[term], course);
+          const enrollment = await store.addEnrollment(BigInt(intx.user.id), termCodes[term], course, section);
           if (enrollment !== undefined) {
             await intx.reply({
               ephemeral: true,
@@ -215,7 +216,7 @@ const scheduleRecord: Module = {
           const sectionNumber = parseInt(sectionNumberRaw);
           if (isNaN(sectionNumber)) return;
 
-          await removeEnrollment(BigInt(intx.user.id), termCodes[term], course, sectionNumber);
+          await store.removeEnrollment(BigInt(intx.user.id), termCodes[term], course, sectionNumber);
 
           await intx.update({
             content: `:white_check_mark: Successfully removed ${course}, section ${zeroPad(
@@ -247,7 +248,7 @@ const scheduleRecord: Module = {
         await ix.deferReply({ ephemeral: true });
         await ensureUserExists(ix.user.id, await fetchInteractionUserNickname(ix));
         const term = parseCleanIntendedTerm(ix);
-        const classes = await getEnrollments(BigInt(ix.user.id), termCodes[term]);
+        const classes = await store.getEnrollments(BigInt(ix.user.id), termCodes[term]);
         const actionRow = scheduleActionRow(classes, term);
 
         await ix.editReply({
@@ -389,7 +390,7 @@ const scheduleRecord: Module = {
 
         const term = parseCleanIntendedTerm(ix);
         await ensureUserExists(ix.user.id, await fetchInteractionUserNickname(ix));
-        await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
+        await store.clearEnrollment(BigInt(ix.user.id), termCodes[term]);
         const addedEnrollments = await Promise.all(
           classNumbers.map(async (num, i) => {
             try {
@@ -403,7 +404,7 @@ const scheduleRecord: Module = {
                 return;
               }
               // Can be optimized into createMany
-              const enrollment = await addEnrollment(
+              const enrollment = await store.addEnrollment(
                 BigInt(ix.user.id),
                 termCodes[term],
                 sectionData[1],
@@ -448,7 +449,7 @@ const scheduleRecord: Module = {
         if (!Object.keys(termCodes).includes(term)) {
           return `:x: ${term} is not a valid term.`;
         }
-        if (!(await hasEnrollments(BigInt(ix.user.id), termCodes[term as Term]))) {
+        if (!(await store.hasEnrollments(BigInt(ix.user.id), termCodes[term as Term]))) {
           return `:x: Your ${term} schedule is empty. Use \`/schedule\` or \`/schedule-set-classes\` to add classes to it.`;
         }
       }
@@ -478,7 +479,7 @@ const scheduleRecord: Module = {
 
       async run(ix: ChatInputCommandInteraction) {
         const term = parseCleanIntendedTerm(ix);
-        await clearEnrollment(BigInt(ix.user.id), termCodes[term]);
+        await store.clearEnrollment(BigInt(ix.user.id), termCodes[term]);
         await ix.reply({
           ephemeral: true,
           content: `Successfully cleared your schedule for ${term}.`,
@@ -532,11 +533,11 @@ async function sendNotifications(client: Client, notifications: { id: bigint; me
 
 async function fetchPeerInfo(studentId: bigint, termCode: number) {
   const [coursemates, classmates, alumni] = await Promise.all([
-    fetchCoursemates(studentId, termCode),
-    fetchSectionPeers(studentId, termCode),
-    fetchCourseAlumni(studentId, termCode),
+    store.fetchCoursemates(studentId, termCode),
+    store.fetchSectionPeers(studentId, termCode),
+    store.fetchCourseAlumni(studentId, termCode),
   ]);
-  const peerInfo: PeerInfo = {
+  const peerInfo: store.PeerInfo = {
     coursemates,
     classmates,
     alumni,
@@ -549,7 +550,7 @@ async function updateDisplayedSchedules(userId: string, term: Term) {
     activeScheduleDisplays
       .filter((disp) => disp.userId === userId && disp.term === termCodes[term])
       .map(async (disp) => {
-        const enrollments = await getEnrollments(BigInt(userId), termCodes[term]);
+        const enrollments = await store.getEnrollments(BigInt(userId), termCodes[term]);
         disp.interaction.editReply({
           ...(await scheduleEmbed(userId, enrollments, term)),
           components: [scheduleActionRow(enrollments, term)],
@@ -588,130 +589,6 @@ function scheduleActionRow(classes: unknown[], term: Term) {
     ],
   });
 }
-
-async function hasEnrollments(user: bigint, term: number): Promise<boolean> {
-  const entry = await client.enrollment.findFirst({
-    where: {
-      studentId: user,
-      term,
-    },
-    select: { id: true },
-  });
-  return entry !== null;
-}
-
-async function enrolledIn(user: bigint, term: number, course: Course): Promise<boolean> {
-  const entry = await client.enrollment.findFirst({
-    where: {
-      studentId: user,
-      term,
-      courseCode: course.toString(),
-    },
-    select: { id: true },
-  });
-  return entry !== null;
-}
-
-async function getEnrollments(user: bigint, term: number): Promise<[Section<true>, Course][]> {
-  const rows = await client.enrollment.findMany({
-    where: {
-      studentId: user,
-      term,
-    },
-    select: {
-      courseCode: true,
-      section: true,
-    },
-  });
-  return await Promise.all(
-    rows.map(async ({ courseCode, section }) => {
-      const course = Course.parse(courseCode);
-      assert(course !== null, `Invalid course stored in database: ${courseCode}`);
-      return [await sharedClient.getSectionBySectionNumber(course, section, term), course] as [Section<true>, Course];
-    })
-  );
-}
-
-async function clearEnrollment(user: bigint, term: number) {
-  await client.enrollment.deleteMany({
-    where: {
-      studentId: user,
-      term,
-    },
-  });
-}
-
-async function addEnrollment(user: bigint, term: number, course: Course, section: number) {
-  const rowData = {
-    studentId: user,
-    term,
-    courseCode: course.toString(),
-    section,
-  };
-
-  const existing = await client.enrollment.findFirst({ where: rowData });
-  if (existing !== null) return;
-  return await client.enrollment.create({ data: rowData });
-}
-
-async function removeEnrollment(user: bigint, term: number, course: Course, section: number) {
-  await client.enrollment.deleteMany({
-    where: {
-      studentId: user,
-      term,
-      courseCode: course.toString(),
-      section,
-    },
-  });
-}
-
-interface PeerInfo {
-  coursemates: { [course: string]: bigint[] };
-  classmates: { [course: string]: { id: bigint; section: number }[] };
-  alumni: { [course: string]: { id: bigint; term: number }[] };
-}
-
-async function fetchCoursemates(user: bigint, term: number): Promise<PeerInfo["coursemates"]> {
-  const allCoursemates: { courseCode: string; studentId: bigint }[] = await client.$queryRaw`
-    SELECT p.courseCode, p.studentId FROM Enrollment p
-      WHERE p.studentId != ${user} AND p.term = ${term} AND
-      EXISTS (SELECT 1 FROM Enrollment s
-        WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term)`;
-
-  return rollUpAsObjectOfArrays(allCoursemates.map((mate) => [mate.courseCode, mate.studentId]));
-}
-
-async function fetchSectionPeers(user: bigint, term: number): Promise<PeerInfo["classmates"]> {
-  const allSectionPeers: { courseCode: string; section: number; studentId: bigint }[] = await client.$queryRaw`
-    SELECT p.courseCode, p.section, p.studentId FROM Enrollment p
-      WHERE p.studentId != ${user} AND p.term = ${term} AND
-      EXISTS (SELECT 1 FROM Enrollment s
-      WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term AND p.section = s.section)`;
-
-  return rollUpAsObjectOfArrays(
-    allSectionPeers.map((mate) => [mate.courseCode, { id: mate.studentId, section: mate.section }])
-  );
-}
-
-async function fetchCourseAlumni(user: bigint, term: number): Promise<PeerInfo["alumni"]> {
-  const alumniList: { studentId: bigint; courseCode: string; term: number }[] = await client.$queryRaw`
-    SELECT e.studentId, e.courseCode, e.term FROM Enrollment e
-    WHERE e.studentId != ${user} AND e.term < ${term} AND
-      EXISTS (SELECT 1 FROM Enrollment f
-        WHERE f.studentId = ${user} AND e.courseCode = f.courseCode AND f.term = ${term})`;
-
-  return rollUpAsObjectOfArrays(alumniList.map((alum) => [alum.courseCode, { id: alum.studentId, term: alum.term }]));
-}
-
-function rollUpAsObjectOfArrays<K extends string | number | symbol, V>(items: [K, V][]): Record<K, V[]> {
-  const out = {} as Record<K, V[]>;
-  for (const [key, value] of items) {
-    out[key] ??= [];
-    out[key].push(value);
-  }
-  return out;
-}
-export default scheduleRecord;
 
 function meetingToLine(mtg: Meeting<true>) {
   return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${
@@ -786,14 +663,14 @@ async function peerNotifications(
   return Object.values(deduplicator);
 }
 
-async function peerEmbeds(peers: PeerInfo, term: Term): Promise<EmbedBuilder[]> {
+async function peerEmbeds(peers: store.PeerInfo, term: Term): Promise<EmbedBuilder[]> {
   const isOrAre = (amount: number) => (amount === 1 ? "is" : "are");
 
   const currentPeerEmbed = new EmbedBuilder({
     title: `${term} Academic Peers`,
     description: Object.keys(peers.coursemates).length === 0 ? "No current peers found." : undefined,
     fields: Object.entries(peers.coursemates).map(([courseStr, ids]) => {
-      const classmateBySection = rollUpAsObjectOfArrays(
+      const classmateBySection = store.rollUpAsObjectOfArrays(
         (peers.classmates[courseStr] ?? []).map((mate) => [mate.section, mate.id])
       );
       const classmateInfo = Object.entries(classmateBySection)
@@ -876,3 +753,5 @@ async function scheduleEmbed(
     files: [new AttachmentBuilder(filePath)],
   };
 }
+
+export default scheduleRecord;

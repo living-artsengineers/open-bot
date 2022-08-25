@@ -8,20 +8,22 @@ import { zeroPad } from "../../utils";
 
 const config = {
   // Width of the entire image shown to the user.
-  imageWidth: 900,
+  imageWidth: 1350,
   // Each hour irl corresponds to this number of pixels high.
-  heightPerHour: 80,
+  heightPerHour: 120,
   // Width reserved for time labels (8 AM, 12 PM, etc.)
-  timeLabelWidth: 60,
+  timeLabelWidth: 90,
   // Height reserved for day labels (Mon, Tue, etc.)
-  dayLabelHeight: 40,
+  dayLabelHeight: 60,
   // Padding around the entire table
-  tablePadding: 20,
+  tablePadding: 30,
   // Padding in each table cell, for text
-  textPadding: 4,
+  textPadding: 6,
   // Normal font for all labels
-  sectionFontFamily: "Iosevka Curly",
-  marginFontFamily: "Iosevka Curly Slab",
+  sectionFontFamily: "Overpass Medium",
+  // Emphasized font for section titles (like course code)
+  sectionTitleFontFamily: "Overpass Bold",
+  marginFontFamily: "Overpass Medium",
   // Colors for distinguishing courses (in RGB)
   courseColors: [
     [91, 88, 143],
@@ -33,8 +35,8 @@ const config = {
     [215, 37, 163],
     [36, 128, 161],
   ],
-  marginFontSize: 18,
-  sectionFontSize: 16,
+  marginFontSize: 28,
+  sectionFontSize: 28,
   style: {
     background: "rgb(47,49,54)",
     borders: "rgb(120,120,120)",
@@ -47,26 +49,15 @@ const config = {
   },
 };
 
-PImage.registerFont(
-  join("fonts", "iosevka-term-curly-regular.ttf"),
-  "Iosevka Curly",
-  400,
-  "normal",
-  "normal"
-).loadSync();
-PImage.registerFont(
-  join("fonts", "iosevka-term-curly-slab-regular.ttf"),
-  "Iosevka Curly Slab",
-  400,
-  "normal",
-  "normal"
-).loadSync();
+PImage.registerFont(join("fonts", "Overpass-Bold.ttf"), "Overpass Bold", 800, "normal", "normal").loadSync();
+PImage.registerFont(join("fonts", "Overpass-Medium.ttf"), "Overpass Medium", 500, "normal", "normal").loadSync();
 PImage.registerFont(join("fonts", "ComicNeue-Bold.ttf"), "Comic Neue", 600, "normal", "normal").loadSync();
 
 export class ScheduleRenderer {
   readonly canvas: Bitmap;
   readonly hoursVisible: number;
   readonly sectionFontFamily: string;
+  readonly sectionTitleFontFamily: string;
   readonly marginFontFamily: string;
 
   constructor(private readonly sections: [Section<true>, Course][]) {
@@ -78,6 +69,7 @@ export class ScheduleRenderer {
     );
     const funny = Math.random() < 0.1;
     this.sectionFontFamily = funny ? "Comic Neue" : config.sectionFontFamily;
+    this.sectionTitleFontFamily = funny ? "Comic Neue" : config.sectionTitleFontFamily;
     this.marginFontFamily = funny ? "Comic Neue" : config.marginFontFamily;
   }
 
@@ -165,15 +157,15 @@ export class ScheduleRenderer {
           height - 2 * config.textPadding
         );
         ctx.fillStyle = config.style.text;
-        ctx.font = `${config.sectionFontSize}px ${this.sectionFontFamily}`;
         const label = [
-          `${course.toString()} ${section.type}`,
-          `Section ${zeroPad(section.number)}`,
+          course.toString(),
+          `${section.type} Section ${zeroPad(section.number)}`,
           `${meeting.location ?? ""}`,
         ];
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         label.forEach((line, i) => {
+          ctx.font = `${config.sectionFontSize}pt ${i === 0 ? this.sectionTitleFontFamily : this.sectionFontFamily}`;
           ctx.fillText(
             line,
             leftX + config.textPadding * 2,

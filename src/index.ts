@@ -23,30 +23,35 @@ async function main() {
     .map((cmd) => new cmd());
 
   client.on("interactionCreate", async (intx) => {
-    const handler = commandHandlers.find((cmd) => cmd._test(intx));
+    try {
+      const handler = commandHandlers.find((cmd) => cmd._test(intx));
 
-    if (handler !== undefined) {
-      if (intx.isCommand()) {
-        console.debug(`${intx.user.username} ran ${intx.commandName} with ${JSON.stringify(intx.options.data)}`);
-      }
-      const checkResult = await handler.check(intx);
-      if (typeof checkResult === "string" && intx.isRepliable()) {
-        intx.reply({ ephemeral: true, content: checkResult });
-        return;
-      }
-      try {
-        await handler.run(intx);
-      } catch (e) {
-        console.error(e);
-        if (intx.isRepliable()) {
-          const message = stripMarkdownTag`Something went wrong on my end. Sorry!\n\`\`\`${e}\`\`\``;
-          if (intx.replied) {
-            await intx.editReply({ content: message });
-          } else {
-            await intx.followUp({ ephemeral: true, content: message });
+      if (handler !== undefined) {
+        if (intx.isCommand()) {
+          console.debug(`${intx.user.username} ran ${intx.commandName} with ${JSON.stringify(intx.options.data)}`);
+        }
+        const checkResult = await handler.check(intx);
+        if (typeof checkResult === "string" && intx.isRepliable()) {
+          intx.reply({ ephemeral: true, content: checkResult });
+          return;
+        }
+        try {
+          await handler.run(intx);
+        } catch (e) {
+          console.error(e);
+          if (intx.isRepliable()) {
+            const message = stripMarkdownTag`Something went wrong on my end. Sorry!\n\`\`\`${e}\`\`\``;
+            if (intx.replied) {
+              await intx.editReply({ content: message });
+            } else {
+              await intx.followUp({ ephemeral: true, content: message });
+            }
           }
         }
       }
+    } catch (err) {
+      console.error("Catastrophic error attempting to react to interaction (failed to report error to user)");
+      console.error(err);
     }
   });
 
