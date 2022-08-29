@@ -87,7 +87,7 @@ export interface PeerInfo {
 
 export async function fetchCoursemates(user: bigint, term: number): Promise<PeerInfo["coursemates"]> {
   const allCoursemates: { courseCode: string; studentId: bigint }[] = await client.$queryRaw`
-    SELECT p.courseCode, p.studentId FROM Enrollment p
+    SELECT DISTINCT p.courseCode, p.studentId FROM Enrollment p
       WHERE p.studentId != ${user} AND p.term = ${term} AND
       EXISTS (SELECT 1 FROM Enrollment s
         WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term)`;
@@ -97,7 +97,7 @@ export async function fetchCoursemates(user: bigint, term: number): Promise<Peer
 
 export async function fetchSectionPeers(user: bigint, term: number): Promise<PeerInfo["classmates"]> {
   const allSectionPeers: { courseCode: string; section: number; studentId: bigint }[] = await client.$queryRaw`
-    SELECT p.courseCode, p.section, p.studentId FROM Enrollment p
+    SELECT DISTINCT p.courseCode, p.section, p.studentId FROM Enrollment p
       WHERE p.studentId != ${user} AND p.term = ${term} AND
       EXISTS (SELECT 1 FROM Enrollment s
       WHERE s.studentId = ${user} AND p.courseCode = s.courseCode AND p.term = s.term AND p.section = s.section)`;
@@ -109,7 +109,7 @@ export async function fetchSectionPeers(user: bigint, term: number): Promise<Pee
 
 export async function fetchCourseAlumni(user: bigint, term: number): Promise<PeerInfo["alumni"]> {
   const alumniList: { studentId: bigint; courseCode: string; term: number }[] = await client.$queryRaw`
-    SELECT e.studentId, e.courseCode, e.term FROM Enrollment e
+    SELECT DISTINCT e.studentId, e.courseCode, e.term FROM Enrollment e
     WHERE e.studentId != ${user} AND e.term < ${term} AND
       EXISTS (SELECT 1 FROM Enrollment f
         WHERE f.studentId = ${user} AND e.courseCode = f.courseCode AND f.term = ${term})`;
