@@ -192,9 +192,8 @@ const scheduleRecord: Module = {
           if (enrollment !== undefined) {
             await intx.reply({
               ephemeral: true,
-              content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${
-                sectionInfo.type
-              }) to your ${term} schedule.`,
+              content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${sectionInfo.type
+                }) to your ${term} schedule.`,
             });
             await updateDisplayedSchedules(intx.user.id, term);
             await sendNotifications(intx.client, await peerNotifications(enrollment, alreadyInCourse));
@@ -512,6 +511,62 @@ const scheduleRecord: Module = {
         });
       }
     },
+    class ScheduleShareCommand extends SlashCommand {
+      name = "schedule-share"
+      description = "Sends a DM of your schedule to another user"
+      build(builder: SlashCommandBuilder) {
+        builder.addUserOption((opt) =>
+          opt
+            .setName("recipient")
+            .setDescription("The users who will receive a DM of your schedule")
+            .setRequired(true)
+        )
+          .addStringOption((opt) =>
+            opt
+              .setName("term")
+              .setDescription(
+                `The academic term of the schedule you want to share. Current default: ${defaultTerm}`)
+              .addChoices(...Object.keys(termCodes).map((name) => ({ name, value: name })))
+              .setRequired(false))
+      }
+
+      async check(ix: ChatInputCommandInteraction) {
+        const term = ix.options.getString("term", false) ?? defaultTerm;
+        if (!Object.keys(termCodes).includes(term)) {
+          return `:x: ${term} is not a valid term.`;
+        }
+        await ensureUserExists(ix.user.id, await fetchInteractionUserNickname(ix));
+      }
+
+      async run(ix: ChatInputCommandInteraction) {
+        await ix.deferReply({ ephemeral: true });
+        const senderNickname = await fetchInteractionUserNickname(ix);
+        const term = ix.options.getString("term", false) ?? defaultTerm;
+        const termCode = termCodes[term as keyof typeof termCodes];
+        const enrollments = await store.getEnrollments(BigInt(ix.user.id), termCode);
+        const renderer = new ScheduleRenderer(enrollments);
+        const filename = `${ix.user.id}-${termCode}-schedule.png`;
+        const filepath = join("assets", filename);
+        await renderer.render(filepath);
+
+        const recipient = ix.options.getUser("recipient", true);
+        try {
+          await recipient.send({
+            content: `${senderNickname} has sent you their ${term} schedule`,
+            files: [new AttachmentBuilder(filepath)]
+          });
+          const replySuffix = enrollments.length === 0 ? ", but it is empty." : ".";
+          await ix.editReply({
+            content: `${userMention(recipient.id)} has successfully received your ${term} schedule${replySuffix}`,
+          });
+        } catch (e) {
+          console.error(e);
+          await ix.editReply({
+            content: `:x: Failed to send your ${term} schedule to ${userMention(recipient.id)}. Maybe they do not allow DMs from server members.`
+          })
+        }
+      }
+    }
   ],
 };
 
@@ -591,9 +646,8 @@ function scheduleActionRow(classes: unknown[], term: Term) {
 }
 
 function meetingToLine(mtg: Meeting<true>) {
-  return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${
-    mtg.location === null ? "" : ` in ${mtg.location}`
-  }\n`;
+  return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${mtg.location === null ? "" : ` in ${mtg.location}`
+    }\n`;
 }
 
 async function peerNotifications(
@@ -637,8 +691,7 @@ async function peerNotifications(
     }
     if (relation === "classmate") {
       lines.push(
-        `${peerMention} is taking ${enrollment.courseCode} in ${
-          reverseLookup(termCodes, enrollment.term) ?? "???"
+        `${peerMention} is taking ${enrollment.courseCode} in ${reverseLookup(termCodes, enrollment.term) ?? "???"
         } along with you.`
       );
       if (peer.section === enrollment.section) {
@@ -646,8 +699,7 @@ async function peerNotifications(
       }
     } else {
       lines.push(
-        `${peerMention} took ${enrollment.courseCode} in ${
-          reverseLookup(termCodes, enrollment.term) ?? "an unknown term"
+        `${peerMention} took ${enrollment.courseCode} in ${reverseLookup(termCodes, enrollment.term) ?? "an unknown term"
         }.`
       );
     }
@@ -699,8 +751,7 @@ async function peerEmbeds(peers: store.PeerInfo, term: Term): Promise<EmbedBuild
         value: alums
           .map(
             ({ id, term }) =>
-              `${userMention(id.toString())} took ${courseStr} in ${
-                reverseLookup(termCodes, term) ?? "an unknown term"
+              `${userMention(id.toString())} took ${courseStr} in ${reverseLookup(termCodes, term) ?? "an unknown term"
               }`
           )
           .join("\n"),
@@ -720,7 +771,7 @@ async function scheduleEmbed(
       section.instructors.length === 0
         ? "No known instructors"
         : (section.instructors.length === 1 ? "Instructor: " : "Instructors: ") +
-          section.instructors.map((i) => `${i.firstName} ${i.lastName}`).join(", ");
+        section.instructors.map((i) => `${i.firstName} ${i.lastName}`).join(", ");
     const courseDescription = await sharedClient.getCourseDescription(course, termCodes[term]);
     const courseTitle =
       courseDescription === null
