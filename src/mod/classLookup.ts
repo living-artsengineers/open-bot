@@ -12,7 +12,10 @@ import { termCodes } from "../soc/umichApi";
 import { formatTime, stripMarkdownTag } from "../utils";
 import { AutocompletingSlashCommand, Module } from "./module";
 import { sharedClient as umClient } from "../soc/umichApi";
-import { splitDescription, defaultTerm } from "../soc/umich";
+import { splitDescription } from "../soc/umich";
+
+// It's time to look up Winter 2023 courses
+const defaultTerm: keyof typeof termCodes = "Winter 2023";
 
 export const classLookup: Module = {
   name: "classLookup",
