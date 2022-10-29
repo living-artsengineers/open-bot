@@ -12,18 +12,21 @@ export interface ISocApiClient {
 
 // We unfortunately cannot retrieve past term codes via the SOC API
 export const termCodes = {
+  "Winter 2023": 2420,
   "Fall 2022": 2410,
   "Winter 2022": 2370,
   "Fall 2021": 2360,
 };
 
 const endpointPrefix = "https://apigw.it.umich.edu/um/Curriculum/SOC";
+const sectionCacheHoursToLive = 12;
+
 export class UMichSocApiClient implements ISocApiClient {
   private accessToken: { value: string; expireAt: DateTime } | null = null;
   private axios: AxiosInstance = axios.create({ baseURL: endpointPrefix });
   // a null in the cache means that the course catalog doesn't have that value (don't ask for it again)
   private descriptionCache: { [term: number]: { [course: string]: string | null } } = {};
-  private sectionCache: { [term: number]: { [course: string]: { [section: number]: Section<true> | null } } } = {};
+  private sectionCache: { [term: number]: { [course: string]: { [section: number]: [Date, Section<true> | null] } } } = {};
 
   async fetchAllSections(course: Course, termCode: number): Promise<Section[]> {
     await this.refreshTokenIfNeeded();
@@ -42,15 +45,15 @@ export class UMichSocApiClient implements ISocApiClient {
   ): Promise<Section<true> | null> {
     // FIXME: Enrollment is ephemeral and should expire
     const cached = this.sectionCache[termCode]?.[course.toString()]?.[sectionNumber];
-    if (cached !== undefined) {
-      return cached;
+    if (cached !== undefined && (Date.now() - cached[0].getTime()) / 1000 / 60 / 60 <= sectionCacheHoursToLive) {
+      return cached[1];
     }
     const section = await this.fetchSectionBySectionNumber(course, sectionNumber, termCode);
     // This careful walking into nested objects is repetitive and deserves a utility function
     if (this.sectionCache[termCode] === undefined) this.sectionCache[termCode] = {};
     if (this.sectionCache[termCode][course.toString()] === undefined)
       this.sectionCache[termCode][course.toString()] = {};
-    this.sectionCache[termCode][course.toString()][sectionNumber] = section;
+    this.sectionCache[termCode][course.toString()][sectionNumber] = [new Date(), section];
     return section;
   }
 
