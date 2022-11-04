@@ -69,9 +69,9 @@ test("reverseLookup", () => {
 });
 
 test("formatTime", () => {
-  expect(formatTime(Duration.fromObject({ hour: 8 }))).toEqual("8:00 AM");
-  expect(formatTime(Duration.fromObject({ hour: 8, minute: 30 }))).toEqual("8:30 AM");
-  expect(formatTime(Duration.fromObject({ hour: 0, minute: 12 }))).toEqual("12:12 AM");
-  expect(formatTime(Duration.fromObject({ hour: 12, minute: 12 }))).toEqual("12:12 PM");
-  expect(formatTime(Duration.fromObject({ hour: 23, minute: 59 }))).toEqual("11:59 PM");
+  expect(formatTime(Duration.fromObject({ hour: 8 }))).toEqual("8:00\u202fAM");
+  expect(formatTime(Duration.fromObject({ hour: 8, minute: 30 }))).toEqual("8:30\u202fAM");
+  expect(formatTime(Duration.fromObject({ hour: 0, minute: 12 }))).toEqual("12:12\u202fAM");
+  expect(formatTime(Duration.fromObject({ hour: 12, minute: 12 }))).toEqual("12:12\u202fPM");
+  expect(formatTime(Duration.fromObject({ hour: 23, minute: 59 }))).toEqual("11:59\u202fPM");
 });

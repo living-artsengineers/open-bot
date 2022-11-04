@@ -19,25 +19,26 @@
   "author": "Living ArtsEngineers",
   "license": "MIT",
   "devDependencies": {
-    "@swc-node/register": "^1.5.1",
-    "@types/node": "^18.6.4",
-    "@typescript-eslint/eslint-plugin": "^5.32.0",
-    "@typescript-eslint/parser": "^5.32.0",
-    "eslint": "^8.21.0",
-    "nodemon": "^2.0.19",
+    "@swc-node/register": "^1.5.4",
+    "@swc/core": "^1.3.11",
+    "@types/node": "^18.11.7",
+    "@typescript-eslint/eslint-plugin": "^5.41.0",
+    "@typescript-eslint/parser": "^5.41.0",
+    "eslint": "^8.26.0",
+    "nodemon": "^2.0.20",
     "prettier": "2.7.1",
-    "prisma": "^4.2.1",
-    "typescript": "^4.7.4",
-    "vitest": "^0.21.0"
+    "prisma": "^4.5.0",
+    "typescript": "^4.8.4",
+    "vitest": "0.24.3"
   },
   "dependencies": {
-    "@discordjs/rest": "^1.0.1",
-    "@prisma/client": "^4.2.1",
-    "@types/luxon": "^3.0.0",
+    "@discordjs/rest": "^1.3.0",
+    "@prisma/client": "^4.5.0",
+    "@types/luxon": "^3.0.2",
     "axios": "^0.27.2",
-    "discord.js": "^14.1.2",
+    "discord.js": "^14.6.0",
     "geolib": "^3.3.3",
-    "luxon": "^3.0.1",
+    "luxon": "^3.0.4",
     "pureimage": "^0.3.14"
   }
 }
