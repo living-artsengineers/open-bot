@@ -12,6 +12,7 @@ interface Environment {
     clientSecret: string;
   };
   mapboxToken: string;
+  adminId: string;
   name: keyof typeof envConfig;
 }
 
