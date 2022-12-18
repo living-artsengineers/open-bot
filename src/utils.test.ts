@@ -1,6 +1,6 @@
 import { Duration } from "luxon";
 import { test, expect } from "vitest";
-import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad, reverseLookup, formatTime } from "./utils";
+import { stripMarkdown, stripMarkdownTag, truncateText, zeroPad, reverseLookup, formatTime, groupItems } from "./utils";
 
 test("stripMarkdown", () => {
   const cases = {
@@ -74,4 +74,28 @@ test("formatTime", () => {
   expect(formatTime(Duration.fromObject({ hour: 0, minute: 12 }))).toEqual("12:12\u202fAM");
   expect(formatTime(Duration.fromObject({ hour: 12, minute: 12 }))).toEqual("12:12\u202fPM");
   expect(formatTime(Duration.fromObject({ hour: 23, minute: 59 }))).toEqual("11:59\u202fPM");
+});
+
+test("groupItems", () => {
+  const items = [
+    { group: "A", value: 2 },
+    { group: "B", value: 4 },
+    { group: "C", value: 5 },
+    { group: "C", value: 9 },
+    { group: "A", value: 0 },
+    { group: "C", value: 1 },
+  ];
+  const grouped = groupItems(items, (i) => i.group);
+  expect(grouped).toEqual({
+    A: [
+      { group: "A", value: 2 },
+      { group: "A", value: 0 },
+    ],
+    B: [{ group: "B", value: 4 }],
+    C: [
+      { group: "C", value: 5 },
+      { group: "C", value: 9 },
+      { group: "C", value: 1 },
+    ],
+  });
 });

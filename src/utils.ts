@@ -59,3 +59,12 @@ export function formatTime(dur: Duration | null): string {
   const date = DateTime.fromObject({ hour: dur.hours, minute: dur.minutes });
   return date.setLocale("en-US").toLocaleString(DateTime.TIME_SIMPLE);
 }
+
+export function groupItems<T>(items: T[], key: (item: T) => string): { [key: string]: T[] } {
+  return items.reduce((groups: { [key: string]: T[] }, item: T) => {
+    const itemKey = key(item);
+    if (!(itemKey in groups)) groups[itemKey] = [];
+    groups[itemKey].push(item);
+    return groups;
+  }, {});
+}

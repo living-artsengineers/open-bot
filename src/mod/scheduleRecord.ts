@@ -26,6 +26,7 @@ import {
   truncateText,
   zeroPad,
   formatTime,
+  groupItems,
 } from "../utils";
 import { Module, SlashCommand } from "./module";
 import { sharedClient } from "../soc/umichApi";
@@ -192,8 +193,9 @@ const scheduleRecord: Module = {
           if (enrollment !== undefined) {
             await intx.reply({
               ephemeral: true,
-              content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${sectionInfo.type
-                }) to your ${term} schedule.`,
+              content: `:white_check_mark: Successfully added ${course}, section ${zeroPad(section)} (${
+                sectionInfo.type
+              }) to your ${term} schedule.`,
             });
             await updateDisplayedSchedules(intx.user.id, term);
             await sendNotifications(intx.client, await peerNotifications(enrollment, alreadyInCourse));
@@ -512,22 +514,23 @@ const scheduleRecord: Module = {
       }
     },
     class ScheduleShareCommand extends SlashCommand {
-      name = "schedule-share"
-      description = "Sends a DM of your schedule to another user"
+      name = "schedule-share";
+      description = "Sends a DM of your schedule to another user";
       build(builder: SlashCommandBuilder) {
-        builder.addUserOption((opt) =>
-          opt
-            .setName("recipient")
-            .setDescription("The users who will receive a DM of your schedule")
-            .setRequired(true)
-        )
+        builder
+          .addUserOption((opt) =>
+            opt
+              .setName("recipient")
+              .setDescription("The users who will receive a DM of your schedule")
+              .setRequired(true)
+          )
           .addStringOption((opt) =>
             opt
               .setName("term")
-              .setDescription(
-                `The academic term of the schedule you want to share. Current default: ${defaultTerm}`)
+              .setDescription(`The academic term of the schedule you want to share. Current default: ${defaultTerm}`)
               .addChoices(...Object.keys(termCodes).map((name) => ({ name, value: name })))
-              .setRequired(false))
+              .setRequired(false)
+          );
       }
 
       async check(ix: ChatInputCommandInteraction) {
@@ -553,7 +556,7 @@ const scheduleRecord: Module = {
         try {
           await recipient.send({
             content: `${senderNickname} has sent you their ${term} schedule`,
-            files: [new AttachmentBuilder(filepath)]
+            files: [new AttachmentBuilder(filepath)],
           });
           const replySuffix = enrollments.length === 0 ? ", but it is empty." : ".";
           await ix.editReply({
@@ -562,11 +565,13 @@ const scheduleRecord: Module = {
         } catch (e) {
           console.error(e);
           await ix.editReply({
-            content: `:x: Failed to send your ${term} schedule to ${userMention(recipient.id)}. Maybe they do not allow DMs from server members.`
-          })
+            content: `:x: Failed to send your ${term} schedule to ${userMention(
+              recipient.id
+            )}. Maybe they do not allow DMs from server members.`,
+          });
         }
       }
-    }
+    },
   ],
 };
 
@@ -646,8 +651,9 @@ function scheduleActionRow(classes: unknown[], term: Term) {
 }
 
 function meetingToLine(mtg: Meeting<true>) {
-  return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${mtg.location === null ? "" : ` in ${mtg.location}`
-    }\n`;
+  return `${Array.from(mtg.days).join(", ")} from ${formatTime(mtg.startTime)} to ${formatTime(mtg.endTime)}${
+    mtg.location === null ? "" : ` in ${mtg.location}`
+  }\n`;
 }
 
 async function peerNotifications(
@@ -691,7 +697,8 @@ async function peerNotifications(
     }
     if (relation === "classmate") {
       lines.push(
-        `${peerMention} is taking ${enrollment.courseCode} in ${reverseLookup(termCodes, enrollment.term) ?? "???"
+        `${peerMention} is taking ${enrollment.courseCode} in ${
+          reverseLookup(termCodes, enrollment.term) ?? "???"
         } along with you.`
       );
       if (peer.section === enrollment.section) {
@@ -699,7 +706,8 @@ async function peerNotifications(
       }
     } else {
       lines.push(
-        `${peerMention} took ${enrollment.courseCode} in ${reverseLookup(termCodes, enrollment.term) ?? "an unknown term"
+        `${peerMention} took ${enrollment.courseCode} in ${
+          reverseLookup(termCodes, enrollment.term) ?? "an unknown term"
         }.`
       );
     }
@@ -748,13 +756,15 @@ async function peerEmbeds(peers: store.PeerInfo, term: Term): Promise<EmbedBuild
     fields: Object.entries(peers.alumni).map(([courseStr, alums]) => {
       return {
         name: courseStr,
-        value: alums
+        value: Object.entries(groupItems(alums, (alum) => alum.term.toString()))
           .map(
-            ({ id, term }) =>
-              `${userMention(id.toString())} took ${courseStr} in ${reverseLookup(termCodes, term) ?? "an unknown term"
+            ([termCodeStr, alums]) =>
+              `${alums.map((alum) => userMention(alum.id.toString())).join(", ")}: ${
+                reverseLookup(termCodes, Number(termCodeStr)) ?? "unknown"
               }`
           )
-          .join("\n"),
+          .join("\n")
+          .slice(0, 1024),
       };
     }),
   });
@@ -771,7 +781,7 @@ async function scheduleEmbed(
       section.instructors.length === 0
         ? "No known instructors"
         : (section.instructors.length === 1 ? "Instructor: " : "Instructors: ") +
-        section.instructors.map((i) => `${i.firstName} ${i.lastName}`).join(", ");
+          section.instructors.map((i) => `${i.firstName} ${i.lastName}`).join(", ");
     const courseDescription = await sharedClient.getCourseDescription(course, termCodes[term]);
     const courseTitle =
       courseDescription === null
