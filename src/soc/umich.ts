@@ -15,4 +15,4 @@ export function splitDescription(description: string): { title: string; details:
 }
 
 // Change every term
-export const defaultTerm: keyof typeof termCodes = "Fall 2022";
+export const defaultTerm: keyof typeof termCodes = "Winter 2023";
