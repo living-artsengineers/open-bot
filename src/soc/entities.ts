@@ -1,8 +1,8 @@
-import { devAssert } from "../utils";
-import { Duration } from "luxon";
+import { devAssert } from '../utils'
+import { Duration } from 'luxon'
 
 export class Course {
-  constructor(
+  constructor (
     /**
      * The subject code of this course in uppercase.
      *
@@ -16,30 +16,30 @@ export class Course {
      */
     public readonly number: number
   ) {
-    devAssert(subject.trim().toUpperCase() === subject, "Course subject must be all uppercase and trimmed");
-    devAssert(Math.floor(number) === number, "Course number must be an integer");
-    devAssert(number > 99 && number < 1000, "Course number must be between 100 and 999");
+    devAssert(subject.trim().toUpperCase() === subject, 'Course subject must be all uppercase and trimmed')
+    devAssert(Math.floor(number) === number, 'Course number must be an integer')
+    devAssert(number > 99 && number < 1000, 'Course number must be between 100 and 999')
   }
 
-  static parse(str: string): Course | null {
-    const trimmed = str.trim();
+  static parse (str: string): Course | null {
+    const trimmed = str.trim()
     if (/\s/.test(trimmed)) {
-      const [subject, numberStr] = trimmed.split(/\s+/g);
-      const number = parseInt(numberStr.trim(), 10);
-      if (isNaN(number)) return null;
-      return new Course(subject.trim().toUpperCase(), number);
+      const [subject, numberStr] = trimmed.split(/\s+/g)
+      const number = parseInt(numberStr.trim(), 10)
+      if (isNaN(number)) return null
+      return new Course(subject.trim().toUpperCase(), number)
     }
-    const numberMatch = /\d/.exec(trimmed);
+    const numberMatch = /\d/.exec(trimmed)
     if (numberMatch !== null) {
-      const number = parseInt(trimmed.substring(numberMatch.index), 10);
-      if (isNaN(number)) return null;
-      return new Course(trimmed.substring(0, numberMatch.index).trim().toUpperCase(), number);
+      const number = parseInt(trimmed.substring(numberMatch.index), 10)
+      if (isNaN(number)) return null
+      return new Course(trimmed.substring(0, numberMatch.index).trim().toUpperCase(), number)
     }
-    return null;
+    return null
   }
 
-  toString(): string {
-    return `${this.subject} ${this.number}`;
+  toString (): string {
+    return `${this.subject} ${this.number}`
   }
 }
 
@@ -47,90 +47,90 @@ export enum SectionType {
   /**
    * Lecture
    */
-  LEC = "LEC",
+  LEC = 'LEC',
   /**
    * Laboratory
    */
-  LAB = "LAB",
+  LAB = 'LAB',
   /**
    * Discussion
    */
-  DIS = "DIS",
+  DIS = 'DIS',
   /**
    * Recitation
    */
-  REC = "REC",
+  REC = 'REC',
   /**
    * Seminar
    */
-  SEM = "SEM",
+  SEM = 'SEM',
   /**
    * Clinic?
    */
-  CLN = "CLN",
+  CLN = 'CLN',
   /**
    * Midterm
    */
-  MID = "MID",
+  MID = 'MID',
   /**
    * Independent
    */
-  IND = "IND",
+  IND = 'IND',
 }
 
 export enum EnrollmentStatus {
-  Open = "Open",
-  WaitList = "Wait List",
-  Closed = "Closed",
+  Open = 'Open',
+  WaitList = 'Wait List',
+  Closed = 'Closed',
 }
 
 export enum Weekday {
-  Monday = "Mon",
-  Tuesday = "Tue",
-  Wednesday = "Wed",
-  Thursday = "Thu",
-  Friday = "Fri",
-  Saturday = "Sat",
-  Sunday = "Sun",
+  Monday = 'Mon',
+  Tuesday = 'Tue',
+  Wednesday = 'Wed',
+  Thursday = 'Thu',
+  Friday = 'Fri',
+  Saturday = 'Sat',
+  Sunday = 'Sun',
 }
 
 export interface Meeting<Loc extends boolean = false> {
   /**
    * The set of weekdays on which this meeting takes place.
    */
-  days: Set<Weekday>;
+  days: Set<Weekday>
   /**
    * The duration from midnight to the starting time of this meeting, or null if TBA.
    */
-  startTime: Duration | null;
+  startTime: Duration | null
   /**
    * The duration from midnight to the ending time of this meeting, or null if TBA.
    */
-  endTime: Duration | null;
+  endTime: Duration | null
 
   /**
    * @example "1690 BEYSTER"
    */
-  location: Loc extends true ? string | null : null;
+  location: Loc extends true ? string | null : null
 }
 
 export interface Section<Loc extends boolean = false> {
-  readonly number: number;
-  readonly type: SectionType;
-  readonly enrollStatus: EnrollmentStatus;
-  readonly enrolled: number;
-  readonly capacity: number;
+  readonly number: number
+  readonly type: SectionType
+  readonly enrollStatus: EnrollmentStatus
+  readonly enrolled: number
+  readonly capacity: number
   /**
    * Number of seats available.
    * This is not always equal to `capacity - enrolled`.
    */
-  readonly seatsAvailable: number;
-  readonly credits: number;
-  readonly classNumber: number;
-  readonly meetings: Meeting<Loc>[];
-  readonly instructors: {
-    uniqname: string;
-    firstName: string;
-    lastName: string;
-  }[];
+  readonly seatsAvailable: number
+  readonly credits: number
+  readonly classNumber: number
+  readonly meetings: Array<Meeting<Loc>>
+  readonly instructors: Array<{
+    uniqname: string
+    firstName: string
+    lastName: string
+  }>
 }

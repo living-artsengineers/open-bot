@@ -1,15 +1,15 @@
-import { Duration } from "luxon";
-import { expect, test } from "vitest";
-import { EnrollmentStatus, Section, SectionType, Weekday } from "./entities";
-import { parseSection, SectionJson } from "./umichApi";
+import { Duration } from 'luxon'
+import { expect, test } from 'vitest'
+import { EnrollmentStatus, SectionType, Weekday } from './entities'
+import { parseSection, SectionJson } from './umichApi'
 
-test("Parse Sections response", () => {
+test('Parse Sections response', () => {
   const chem126Section: SectionJson = {
     SectionNumber: 300,
-    SectionType: <SectionType>"LEC",
-    SessionDescr: "Regular",
-    InstructionMode: "In Person",
-    EnrollmentStatus: "Closed",
+    SectionType: SectionType.LEC,
+    SessionDescr: 'Regular',
+    InstructionMode: 'In Person',
+    EnrollmentStatus: 'Closed',
     EnrollmentTotal: 0,
     EnrollmentCapacity: 0,
     AvailableSeats: 0,
@@ -19,13 +19,13 @@ test("Parse Sections response", () => {
     ClassNumber: 17132,
     Meeting: {
       MeetingNumber: 1,
-      Days: "TBA",
-      Times: "TBA",
-      ClassMtgTopic: "TBA",
-      Instructors: "Staff",
-    },
-  };
-  expect(parseSection(chem126Section)).toEqual(<Section>{
+      Days: 'TBA',
+      Times: 'TBA',
+      ClassMtgTopic: 'TBA',
+      Instructors: 'Staff'
+    }
+  }
+  expect(parseSection(chem126Section)).toEqual({
     number: 300,
     type: SectionType.LEC,
     enrollStatus: EnrollmentStatus.Closed,
@@ -35,15 +35,15 @@ test("Parse Sections response", () => {
     credits: 1,
     classNumber: 17132,
     meetings: [],
-    instructors: [],
-  });
+    instructors: []
+  })
 
   const ners250Section: SectionJson = {
-    SectionNumber: "001",
-    SectionType: <SectionType>"LEC",
-    SessionDescr: "Regular",
-    InstructionMode: "In Person",
-    EnrollmentStatus: "Open",
+    SectionNumber: '001',
+    SectionType: SectionType.LEC,
+    SessionDescr: 'Regular',
+    InstructionMode: 'In Person',
+    EnrollmentStatus: 'Open',
     EnrollmentTotal: 19,
     EnrollmentCapacity: 32,
     AvailableSeats: 13,
@@ -54,35 +54,35 @@ test("Parse Sections response", () => {
     Meeting: [
       {
         MeetingNumber: 1,
-        Days: "MoWe",
-        Times: "10:30AM - 11:30AM",
-        ClassMtgTopic: "TBA",
-        Instructors: "Allen,Todd Randall ; Gui,Yifan ; Myers,Patrick Andrew",
+        Days: 'MoWe',
+        Times: '10:30AM - 11:30AM',
+        ClassMtgTopic: 'TBA',
+        Instructors: 'Allen,Todd Randall ; Gui,Yifan ; Myers,Patrick Andrew'
       },
       {
         MeetingNumber: 3,
-        Days: "Fr",
-        Times: "9:30AM - 11:30AM",
-        ClassMtgTopic: "TBA",
-        Instructors: "Allen,Todd Randall ; Gui,Yifan ; Myers,Patrick Andrew",
-      },
+        Days: 'Fr',
+        Times: '9:30AM - 11:30AM',
+        ClassMtgTopic: 'TBA',
+        Instructors: 'Allen,Todd Randall ; Gui,Yifan ; Myers,Patrick Andrew'
+      }
     ],
     ClassInstructors: [
       {
-        InstrUniqname: "TRAUMICH",
-        InstrName: "Allen,Todd Randall",
+        InstrUniqname: 'TRAUMICH',
+        InstrName: 'Allen,Todd Randall'
       },
       {
-        InstrUniqname: "EVANGYF",
-        InstrName: "Gui,Yifan",
+        InstrUniqname: 'EVANGYF',
+        InstrName: 'Gui,Yifan'
       },
       {
-        InstrUniqname: "MYERSPAT",
-        InstrName: "Myers,Patrick Andrew",
-      },
-    ],
-  };
-  expect(parseSection(ners250Section)).toEqual(<Section>{
+        InstrUniqname: 'MYERSPAT',
+        InstrName: 'Myers,Patrick Andrew'
+      }
+    ]
+  }
+  expect(parseSection(ners250Section)).toEqual({
     number: 1,
     type: SectionType.LEC,
     enrollStatus: EnrollmentStatus.Open,
@@ -96,40 +96,40 @@ test("Parse Sections response", () => {
         days: new Set([Weekday.Monday, Weekday.Wednesday]),
         startTime: Duration.fromObject({ hour: 10, minute: 30 }),
         endTime: Duration.fromObject({ hour: 11, minute: 30 }),
-        location: null,
+        location: null
       },
       {
         days: new Set([Weekday.Friday]),
         startTime: Duration.fromObject({ hour: 9, minute: 30 }),
         endTime: Duration.fromObject({ hour: 11, minute: 30 }),
-        location: null,
-      },
+        location: null
+      }
     ],
     instructors: [
       {
-        uniqname: "traumich",
-        firstName: "Todd",
-        lastName: "Allen",
+        uniqname: 'traumich',
+        firstName: 'Todd',
+        lastName: 'Allen'
       },
       {
-        uniqname: "evangyf",
-        firstName: "Yifan",
-        lastName: "Gui",
+        uniqname: 'evangyf',
+        firstName: 'Yifan',
+        lastName: 'Gui'
       },
       {
-        uniqname: "myerspat",
-        firstName: "Patrick",
-        lastName: "Myers",
-      },
-    ],
-  });
+        uniqname: 'myerspat',
+        firstName: 'Patrick',
+        lastName: 'Myers'
+      }
+    ]
+  })
 
   const chem215Section: SectionJson = {
     SectionNumber: 100,
-    SectionType: <SectionType>"LEC",
-    SessionDescr: "Regular",
-    InstructionMode: "In Person",
-    EnrollmentStatus: "Open",
+    SectionType: SectionType.LEC,
+    SessionDescr: 'Regular',
+    InstructionMode: 'In Person',
+    EnrollmentStatus: 'Open',
     EnrollmentTotal: 439,
     EnrollmentCapacity: 450,
     AvailableSeats: 11,
@@ -139,20 +139,20 @@ test("Parse Sections response", () => {
     ClassNumber: 28336,
     Meeting: {
       MeetingNumber: 1,
-      Days: "MoWeFr",
-      Times: "9:00AM - 10:00AM",
-      ClassMtgTopic: "TBA",
-      Instructors: "Coppola,Brian P",
+      Days: 'MoWeFr',
+      Times: '9:00AM - 10:00AM',
+      ClassMtgTopic: 'TBA',
+      Instructors: 'Coppola,Brian P'
     },
     Instructor: {
-      InstructorName: "Coppola,Brian P",
-      Uniqname: "BCOPPOLA",
-      FirstName: "Brian",
-      LastName: "Coppola",
-    },
-  };
+      InstructorName: 'Coppola,Brian P',
+      Uniqname: 'BCOPPOLA',
+      FirstName: 'Brian',
+      LastName: 'Coppola'
+    }
+  }
 
-  expect(parseSection(chem215Section)).toEqual(<Section>{
+  expect(parseSection(chem215Section)).toEqual({
     number: 100,
     type: SectionType.LEC,
     enrollStatus: EnrollmentStatus.Open,
@@ -166,15 +166,15 @@ test("Parse Sections response", () => {
         days: new Set([Weekday.Monday, Weekday.Wednesday, Weekday.Friday]),
         startTime: Duration.fromDurationLike({ hour: 9, minute: 0 }),
         endTime: Duration.fromDurationLike({ hour: 10, minute: 0 }),
-        location: null,
-      },
+        location: null
+      }
     ],
     instructors: [
       {
-        firstName: "Brian",
-        lastName: "Coppola",
-        uniqname: "bcoppola",
-      },
-    ],
-  });
-});
+        firstName: 'Brian',
+        lastName: 'Coppola',
+        uniqname: 'bcoppola'
+      }
+    ]
+  })
+})
