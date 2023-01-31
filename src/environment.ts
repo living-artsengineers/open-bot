@@ -7,6 +7,7 @@ interface Environment {
   guild: string
   clientId: string
   token: string
+  reginaldChannel: string
   umApi: {
     clientId: string
     clientSecret: string
