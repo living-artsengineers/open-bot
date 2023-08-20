@@ -206,7 +206,7 @@ const scheduleRecord: Module = {
             });
           }
         }
-      } else if (intx.isSelectMenu()) {
+      } else if (intx.isAnySelectMenu()) {
         const tokens = intx.customId.split(":");
         if (tokens[0] === "schedule-remove-section-submit") {
           const term = tokens[1] as Term;

@@ -12,13 +12,14 @@ export interface ISocApiClient {
 
 // We unfortunately cannot retrieve past term codes via the SOC API
 export const termCodes = {
+  "Fall 2023": 2460,
   "Winter 2023": 2420,
   "Fall 2022": 2410,
   "Winter 2022": 2370,
   "Fall 2021": 2360,
 };
 
-const endpointPrefix = "https://apigw.it.umich.edu/um/Curriculum/SOC";
+const endpointPrefix = "https://gw.api.it.umich.edu/um/Curriculum/SOC";
 const sectionCacheHoursToLive = 12;
 
 export class UMichSocApiClient implements ISocApiClient {
@@ -114,7 +115,7 @@ export class UMichSocApiClient implements ISocApiClient {
 
   private async requestToken() {
     const res = await axios.post(
-      "https://apigw.it.umich.edu/um/aa/oauth2/token",
+      "https://gw.api.it.umich.edu/um/oauth2/token",
       new URLSearchParams({
         grant_type: "client_credentials",
         client_id: environment.umApi.clientId,
@@ -128,7 +129,6 @@ export class UMichSocApiClient implements ISocApiClient {
       expireAt: DateTime.now().plus({ second: res.data.expires_in }),
     };
     this.axios.defaults.headers.get["Authorization"] = `Bearer ${this.accessToken.value}`;
-    this.axios.defaults.headers.get["X-IBM-Client-Id"] = environment.umApi.clientId;
   }
 }
 
