@@ -14,6 +14,7 @@ interface Environment {
   mapboxToken: string;
   adminId: string;
   name: keyof typeof envConfig;
+  birthdaychannel: string;
 }
 
 export default {

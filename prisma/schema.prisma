@@ -26,6 +26,10 @@ model User {
   messages    Message[]
   quotes      Quote[]
   enrollments Enrollment[]
+  // Adds Birthday date
+  Bmonth      Int?
+  Bday        Int?
+
 }
 
 model Conversation {
