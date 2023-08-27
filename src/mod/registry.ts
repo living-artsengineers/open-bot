@@ -3,7 +3,7 @@ import classLookup from "./classLookup";
 import quotes from "./quotes";
 import scheduleRecord from "./scheduleRecord";
 import censorship from "./censorship";
-import BirthdayAnnounc from "./BirthdayAnnounc";
+import birthdayAnnounce from "./birthdayAnnounce";
 
 export default {
   // messageStats,
@@ -11,5 +11,5 @@ export default {
   classLookup,
   scheduleRecord,
   censorship,
-  BirthdayAnnounc
+  birthdayAnnounce,
 };
